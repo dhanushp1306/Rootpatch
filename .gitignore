@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Uploaded projects and extracted workspaces (never commit user uploads)
+backend/workspace/*
+!backend/workspace/.gitkeep
+
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+
+# Frontend / tooling
+node_modules/
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,8 +1,5 @@
-"""API package: aggregates all route modules under the `/api` prefix."""
+"""API package. The aggregated router lives in `app.api.router`."""
 
-from fastapi import APIRouter
+from app.api.router import api_router
 
-from app.api.routes import health
-
-api_router = APIRouter(prefix="/api")
-api_router.include_router(health.router)
+__all__ = ["api_router"]
