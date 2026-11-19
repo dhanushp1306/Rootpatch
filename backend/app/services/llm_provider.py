@@ -95,14 +95,29 @@ class GeminiLLMProvider:
 class OpenAICompatibleLLMProvider:
     """OpenAI / OpenAI-compatible chat completions REST client via httpx."""
 
+    def __init__(
+        self,
+        default_base_url: str | None = None,
+        api_key_env_hint: str | None = None,
+    ) -> None:
+        self.default_base_url = default_base_url
+        self.api_key_env_hint = api_key_env_hint
+
     def analyze(self, system_prompt: str, user_prompt: str, settings: Settings) -> str:
+        provider_name = (settings.llm_provider or "").strip().lower()
+        is_xai = provider_name in ("xai", "grok")
+
         api_key = settings.llm_api_key
         if not api_key:
+            env_hint = self.api_key_env_hint or ("XAI_API_KEY" if is_xai else "OPENAI_API_KEY")
             raise LLMConfigurationError(
-                "LLM provider is not configured. Set ROOTPATCH_LLM_API_KEY or OPENAI_API_KEY."
+                f"LLM provider is not configured. Set ROOTPATCH_LLM_API_KEY or {env_hint}."
             )
 
-        base = (settings.llm_base_url or "https://api.openai.com/v1").rstrip("/")
+        fallback_base = self.default_base_url or (
+            "https://api.x.ai/v1" if is_xai else "https://api.openai.com/v1"
+        )
+        base = (settings.llm_base_url or fallback_base).rstrip("/")
         url = f"{base}/chat/completions"
 
         payload = {
@@ -163,9 +178,17 @@ def build_llm_provider(settings: Settings) -> LLMProvider:
     if provider_name == "gemini":
         return GeminiLLMProvider()
     if provider_name in ("openai", "openai-compatible"):
-        return OpenAICompatibleLLMProvider()
+        return OpenAICompatibleLLMProvider(
+            default_base_url="https://api.openai.com/v1",
+            api_key_env_hint="OPENAI_API_KEY",
+        )
+    if provider_name in ("xai", "grok"):
+        return OpenAICompatibleLLMProvider(
+            default_base_url="https://api.x.ai/v1",
+            api_key_env_hint="XAI_API_KEY",
+        )
     raise LLMConfigurationError(
-        f"Unsupported LLM provider '{settings.llm_provider}'. Supported providers: gemini, openai."
+        f"Unsupported LLM provider '{settings.llm_provider}'. Supported providers: gemini, openai, xai, grok."
     )
 
 

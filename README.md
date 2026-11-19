@@ -111,9 +111,9 @@ The workspace is git-ignored. Configure via environment variables (defaults in p
 | `ROOTPATCH_MAX_SCAN_FILES` | 1000 |
 | `ROOTPATCH_MAX_SCAN_FILE_BYTES` | 2097152 (2 MB) |
 | `ROOTPATCH_SCANNER_TIMEOUT_SECONDS` | 30 |
-| `ROOTPATCH_LLM_PROVIDER` | `gemini` (`gemini` or `openai`) |
-| `ROOTPATCH_LLM_MODEL` | `gemini-4-hydrogen` |
-| `ROOTPATCH_LLM_API_KEY` | unset (or `GEMINI_API_KEY` / `OPENAI_API_KEY`) |
+| `ROOTPATCH_LLM_PROVIDER` | `gemini` (`gemini`, `openai`, `xai`, or `grok`) |
+| `ROOTPATCH_LLM_MODEL` | `gemini-4-hydrogen` (`grok-4.7` when provider is `xai` or `grok`) |
+| `ROOTPATCH_LLM_API_KEY` | unset (or `GEMINI_API_KEY` / `OPENAI_API_KEY` / `XAI_API_KEY`) |
 | `ROOTPATCH_LLM_BASE_URL` | provider default |
 | `ROOTPATCH_LLM_TIMEOUT_SECONDS` | 30 |
 | `ROOTPATCH_CONTEXT_LINES_BEFORE` | 20 |

@@ -90,7 +90,12 @@ def _llm_provider() -> str:
 
 
 def _llm_model() -> str:
-    return _env_str("ROOTPATCH_LLM_MODEL", "gemini-4-hydrogen")
+    explicit = _env_optional_str("ROOTPATCH_LLM_MODEL")
+    if explicit:
+        return explicit
+    if _llm_provider() in ("xai", "grok"):
+        return "grok-4.7"
+    return "gemini-4-hydrogen"
 
 
 def _llm_api_key() -> str | None:
@@ -102,6 +107,8 @@ def _llm_api_key() -> str | None:
         return _env_optional_str("GEMINI_API_KEY")
     if provider == "openai":
         return _env_optional_str("OPENAI_API_KEY")
+    if provider in ("xai", "grok"):
+        return _env_optional_str("XAI_API_KEY")
     return None
 
 
