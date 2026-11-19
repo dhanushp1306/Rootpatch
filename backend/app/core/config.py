@@ -137,6 +137,18 @@ def _max_findings_per_analysis() -> int:
     return _env_int("ROOTPATCH_MAX_FINDINGS_PER_ANALYSIS", 50)
 
 
+def _max_patch_diff_bytes() -> int:
+    return _env_int("ROOTPATCH_MAX_PATCH_DIFF_BYTES", 262144)
+
+
+def _max_patch_hunks() -> int:
+    return _env_int("ROOTPATCH_MAX_PATCH_HUNKS", 25)
+
+
+def _max_patches_per_run() -> int:
+    return _env_int("ROOTPATCH_MAX_PATCHES_PER_RUN", 25)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "RootPatch"
@@ -171,6 +183,11 @@ class Settings:
     max_context_chars_per_finding: int = field(default_factory=_context_chars_per_finding)
     max_total_context_chars: int = field(default_factory=_total_context_chars)
     max_findings_per_analysis: int = field(default_factory=_max_findings_per_analysis)
+
+    # --- Step 5: automated patch generation ---
+    max_patch_diff_bytes: int = field(default_factory=_max_patch_diff_bytes)
+    max_patch_hunks: int = field(default_factory=_max_patch_hunks)
+    max_patches_per_run: int = field(default_factory=_max_patches_per_run)
 
 
 settings = Settings()

@@ -62,3 +62,20 @@ class LLMTimeoutError(AnalysisError):
 class LLMProviderError(AnalysisError):
     def __init__(self, message: str = "LLM provider request failed.", status_code: int = 502) -> None:
         super().__init__(message, status_code)
+
+
+class PatchError(ProjectError):
+    """Automated patch generation failed or persisted patches could not be read."""
+
+
+class PatchNotFoundError(ProjectError):
+    def __init__(self, message: str = "No generated patches found for this project.") -> None:
+        super().__init__(message, 404)
+
+
+class PatchValidationError(PatchError):
+    def __init__(
+        self,
+        message: str = "Generated patch failed safety or unified diff validation.",
+    ) -> None:
+        super().__init__(message, 422)
