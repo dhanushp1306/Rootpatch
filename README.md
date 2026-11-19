@@ -46,24 +46,35 @@ Tests use temporary directories only; they never touch `backend/workspace/`.
 | POST | `/api/projects/{project_id}/patches/{patch_id}/approve` | Explicitly approve a validated patch (does not apply it) |
 | POST | `/api/projects/{project_id}/patches/{patch_id}/reject` | Explicitly reject a patch so it remains unapplied |
 | POST | `/api/projects/{project_id}/patches/{patch_id}/apply` | Revalidate and atomically apply an explicitly approved patch |
+| POST | `/api/projects/{project_id}/patches/{patch_id}/validate` | Run isolated container test validation & baseline regression check on an applied patch |
+| GET | `/api/projects/{project_id}/patches/{patch_id}/validations` | Retrieve validation run history for a specific patch |
+| GET | `/api/projects/{project_id}/validations` | Retrieve all validation runs persisted for a project |
+| GET | `/api/projects/{project_id}/validations/{validation_id}` | Retrieve an individual validation report |
 
 Error responses use `{"detail": "<message>"}`. Status codes: 201 created, 400 invalid/unsafe
-archive, 404 unknown project, scan, analysis, or patch, 409 invalid patch state or stale target,
-413 size/count limit exceeded, 415 unsupported file type, 422 invalid diff or missing form field,
-429 LLM rate limit, 502 LLM provider error, 503 missing LLM configuration, 504 LLM timeout.
+archive, 404 unknown project, scan, analysis, patch, or validation report, 409 invalid patch
+state (e.g. unapplied patch validation) or stale target, 413 size/count limit exceeded, 415
+unsupported file type, 422 invalid diff, unsafe command override, or missing form field, 429 LLM
+rate limit, 502 LLM provider error, 503 missing LLM configuration, 504 LLM timeout.
 
 ## Upload workspace and limits
 
 Each upload gets an isolated directory `backend/workspace/<project_id>/`:
 
 - `original/upload.zip` – read-only copy of the upload
-- `source/` – extracted working copy (uploaded code is never executed)
+- `source/` – extracted working copy (uploaded code is never executed directly on the host)
 - `metadata.json` – project metadata and inspection report
 - `scan_result.json` – latest Step 3 static bug detection report
 - `analysis_result.json` – Step 4 root cause analysis report and history
 - `patches_result.json` – Step 5/6 generated patches, validation, and review/application states
 - `patch_history.json` – Step 6 patch application audit log
+- `validation_result.json` – Step 7 isolated container test validation reports and history
 - `backups/` – immutable pre-application backups of modified source files
+
+> **Container isolation (Step 7):** Patch validation executes tests exclusively inside a hardened,
+> network-disabled (`--network none`), read-only rootfs, non-root Docker container with CPU/memory/PID
+> limits and strict timeouts. If Docker is unavailable, validation reports status `BLOCKED` and
+> never falls back to host execution.
 
 The workspace is git-ignored. Configure via environment variables (defaults in parentheses):
 
@@ -89,4 +100,12 @@ The workspace is git-ignored. Configure via environment variables (defaults in p
 | `ROOTPATCH_MAX_CONTEXT_CHARS_PER_FINDING` | 8000 |
 | `ROOTPATCH_MAX_TOTAL_CONTEXT_CHARS` | 32000 |
 | `ROOTPATCH_MAX_FINDINGS_PER_ANALYSIS` | 50 |
+| `ROOTPATCH_VALIDATION_TIMEOUT_SECONDS` | 60 |
+| `ROOTPATCH_VALIDATION_MEMORY_LIMIT` | `512m` |
+| `ROOTPATCH_VALIDATION_CPUS` | `1.0` |
+| `ROOTPATCH_VALIDATION_PIDS_LIMIT` | 64 |
+| `ROOTPATCH_MAX_VALIDATION_OUTPUT_BYTES` | 65536 (64 KB) |
+| `ROOTPATCH_VALIDATION_PYTHON_IMAGE` | `python:3.11-slim` |
+| `ROOTPATCH_VALIDATION_NODE_IMAGE` | `node:20-slim` |
+| `ROOTPATCH_VALIDATION_NETWORK_DISABLED` | `true` |
 | `ROOTPATCH_CORS_ORIGINS` | local Vite / port 3000 origins |

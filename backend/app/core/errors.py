@@ -95,3 +95,37 @@ class PatchApplicationError(PatchError):
         message: str = "Failed to apply patch safely; original source file was preserved.",
     ) -> None:
         super().__init__(message, 500)
+
+
+class TestValidationError(ProjectError):
+    """Patch test validation failed or received an invalid validation configuration."""
+
+    __test__ = False
+
+    def __init__(
+        self,
+        message: str = "Patch test validation could not be completed.",
+        status_code: int = 422,
+    ) -> None:
+        super().__init__(message, status_code)
+
+
+class ValidationNotFoundError(ProjectError):
+    def __init__(self, message: str = "Validation report not found.") -> None:
+        super().__init__(message, 404)
+
+
+class ValidationConflictError(TestValidationError):
+    def __init__(
+        self,
+        message: str = "Only applied patches can be validated.",
+    ) -> None:
+        super().__init__(message, 409)
+
+
+class ValidationIsolationError(TestValidationError):
+    def __init__(
+        self,
+        message: str = "Isolated container execution environment is unavailable; host execution is disabled.",
+    ) -> None:
+        super().__init__(message, 503)

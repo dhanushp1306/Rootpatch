@@ -149,6 +149,50 @@ def _max_patches_per_run() -> int:
     return _env_int("ROOTPATCH_MAX_PATCHES_PER_RUN", 25)
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    lowered = raw.strip().lower()
+    if lowered in ("1", "true", "yes", "on"):
+        return True
+    if lowered in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+def _validation_timeout_seconds() -> int:
+    return _env_int("ROOTPATCH_VALIDATION_TIMEOUT_SECONDS", 60)
+
+
+def _validation_memory_limit() -> str:
+    return _env_str("ROOTPATCH_VALIDATION_MEMORY_LIMIT", "512m")
+
+
+def _validation_cpus() -> str:
+    return _env_str("ROOTPATCH_VALIDATION_CPUS", "1.0")
+
+
+def _validation_pids_limit() -> int:
+    return _env_int("ROOTPATCH_VALIDATION_PIDS_LIMIT", 64)
+
+
+def _max_validation_output_bytes() -> int:
+    return _env_int("ROOTPATCH_MAX_VALIDATION_OUTPUT_BYTES", 65536)
+
+
+def _validation_python_image() -> str:
+    return _env_str("ROOTPATCH_VALIDATION_PYTHON_IMAGE", "python:3.11-slim")
+
+
+def _validation_node_image() -> str:
+    return _env_str("ROOTPATCH_VALIDATION_NODE_IMAGE", "node:20-slim")
+
+
+def _validation_network_disabled() -> bool:
+    return _env_bool("ROOTPATCH_VALIDATION_NETWORK_DISABLED", True)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "RootPatch"
@@ -188,6 +232,16 @@ class Settings:
     max_patch_diff_bytes: int = field(default_factory=_max_patch_diff_bytes)
     max_patch_hunks: int = field(default_factory=_max_patch_hunks)
     max_patches_per_run: int = field(default_factory=_max_patches_per_run)
+
+    # --- Step 7: isolated testing and patch validation ---
+    validation_timeout_seconds: int = field(default_factory=_validation_timeout_seconds)
+    validation_memory_limit: str = field(default_factory=_validation_memory_limit)
+    validation_cpus: str = field(default_factory=_validation_cpus)
+    validation_pids_limit: int = field(default_factory=_validation_pids_limit)
+    max_validation_output_bytes: int = field(default_factory=_max_validation_output_bytes)
+    validation_python_image: str = field(default_factory=_validation_python_image)
+    validation_node_image: str = field(default_factory=_validation_node_image)
+    validation_network_disabled: bool = field(default_factory=_validation_network_disabled)
 
 
 settings = Settings()
