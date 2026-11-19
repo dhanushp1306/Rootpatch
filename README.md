@@ -25,6 +25,28 @@ python -m pytest
 
 Tests use temporary directories only; they never touch `backend/workspace/`.
 
+## Frontend (`frontend/`)
+
+React + Vite + TypeScript + Tailwind CSS dashboard for the complete RootPatch workflow (upload, structure explorer, static scan, AI root-cause analysis, patch review/approval/application, isolated container validation, and audit history).
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # optional: defaults VITE_API_BASE_URL=http://localhost:8000
+npm run dev
+```
+
+Frontend dev server runs at `http://localhost:5173` (proxying `/api` to `VITE_API_BASE_URL`).
+
+### Frontend verification commands
+
+```bash
+cd frontend
+npm test        # Run Vitest + React Testing Library suite
+npm run typecheck
+npm run build   # Production TypeScript check & Vite bundle into frontend/dist
+```
+
 ## API
 
 | Method | Path | Description |
