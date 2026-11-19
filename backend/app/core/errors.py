@@ -30,3 +30,35 @@ class ScanError(ProjectError):
 class ScanNotFoundError(ProjectError):
     def __init__(self, message: str = "No scan results found for this project.") -> None:
         super().__init__(message, 404)
+
+
+class AnalysisError(ProjectError):
+    """AI root cause analysis failed or could not be read."""
+
+
+class AnalysisNotFoundError(ProjectError):
+    def __init__(self, message: str = "No analysis results found for this project.") -> None:
+        super().__init__(message, 404)
+
+
+class LLMConfigurationError(AnalysisError):
+    def __init__(
+        self,
+        message: str = "LLM provider is not configured. Set ROOTPATCH_LLM_API_KEY or provider API key.",
+    ) -> None:
+        super().__init__(message, 503)
+
+
+class LLMRateLimitError(AnalysisError):
+    def __init__(self, message: str = "LLM provider rate limit exceeded.") -> None:
+        super().__init__(message, 429)
+
+
+class LLMTimeoutError(AnalysisError):
+    def __init__(self, message: str = "LLM provider request timed out.") -> None:
+        super().__init__(message, 504)
+
+
+class LLMProviderError(AnalysisError):
+    def __init__(self, message: str = "LLM provider request failed.", status_code: int = 502) -> None:
+        super().__init__(message, status_code)

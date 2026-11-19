@@ -75,6 +75,68 @@ def _scanner_timeout_limit() -> int:
     return _env_int("ROOTPATCH_SCANNER_TIMEOUT_SECONDS", 30)
 
 
+def _env_str(name: str, default: str) -> str:
+    raw = os.getenv(name)
+    return raw.strip() if raw and raw.strip() else default
+
+
+def _env_optional_str(name: str) -> str | None:
+    raw = os.getenv(name)
+    return raw.strip() if raw and raw.strip() else None
+
+
+def _llm_provider() -> str:
+    return _env_str("ROOTPATCH_LLM_PROVIDER", "gemini").lower()
+
+
+def _llm_model() -> str:
+    return _env_str("ROOTPATCH_LLM_MODEL", "gemini-4-hydrogen")
+
+
+def _llm_api_key() -> str | None:
+    explicit = _env_optional_str("ROOTPATCH_LLM_API_KEY")
+    if explicit:
+        return explicit
+    provider = _llm_provider()
+    if provider == "gemini":
+        return _env_optional_str("GEMINI_API_KEY")
+    if provider == "openai":
+        return _env_optional_str("OPENAI_API_KEY")
+    return None
+
+
+def _llm_base_url() -> str | None:
+    return _env_optional_str("ROOTPATCH_LLM_BASE_URL")
+
+
+def _llm_timeout() -> int:
+    return _env_int("ROOTPATCH_LLM_TIMEOUT_SECONDS", 30)
+
+
+def _context_before() -> int:
+    return _env_int("ROOTPATCH_CONTEXT_LINES_BEFORE", 20)
+
+
+def _context_after() -> int:
+    return _env_int("ROOTPATCH_CONTEXT_LINES_AFTER", 20)
+
+
+def _context_file_bytes() -> int:
+    return _env_int("ROOTPATCH_MAX_CONTEXT_FILE_BYTES", 512 * 1024)
+
+
+def _context_chars_per_finding() -> int:
+    return _env_int("ROOTPATCH_MAX_CONTEXT_CHARS_PER_FINDING", 8000)
+
+
+def _total_context_chars() -> int:
+    return _env_int("ROOTPATCH_MAX_TOTAL_CONTEXT_CHARS", 32000)
+
+
+def _max_findings_per_analysis() -> int:
+    return _env_int("ROOTPATCH_MAX_FINDINGS_PER_ANALYSIS", 50)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "RootPatch"
@@ -96,6 +158,19 @@ class Settings:
     max_scan_files: int = field(default_factory=_scan_files_limit)
     max_scan_file_bytes: int = field(default_factory=_scan_file_bytes_limit)
     scanner_timeout_seconds: int = field(default_factory=_scanner_timeout_limit)
+
+    # --- Step 4: AI-powered root cause analysis ---
+    llm_provider: str = field(default_factory=_llm_provider)
+    llm_model: str = field(default_factory=_llm_model)
+    llm_api_key: str | None = field(default_factory=_llm_api_key, repr=False)
+    llm_base_url: str | None = field(default_factory=_llm_base_url)
+    llm_timeout_seconds: int = field(default_factory=_llm_timeout)
+    max_context_lines_before: int = field(default_factory=_context_before)
+    max_context_lines_after: int = field(default_factory=_context_after)
+    max_context_file_bytes: int = field(default_factory=_context_file_bytes)
+    max_context_chars_per_finding: int = field(default_factory=_context_chars_per_finding)
+    max_total_context_chars: int = field(default_factory=_total_context_chars)
+    max_findings_per_analysis: int = field(default_factory=_max_findings_per_analysis)
 
 
 settings = Settings()

@@ -35,10 +35,14 @@ Tests use temporary directories only; they never touch `backend/workspace/`.
 | GET | `/api/projects/{project_id}/structure` | Directory/file tree |
 | POST | `/api/projects/{project_id}/scan` | Run static bug detection (AST, Ruff, Bandit) on uploaded Python code |
 | GET | `/api/projects/{project_id}/scan` | Retrieve the latest saved scan report for a project |
+| POST | `/api/projects/{project_id}/analyze` | Generate AI root cause analysis from the latest scan results |
+| GET | `/api/projects/{project_id}/analysis` | Retrieve the latest saved root cause analysis report |
+| GET | `/api/projects/{project_id}/analysis/{analysis_id}` | Retrieve an individual root cause analysis record |
 
 Error responses use `{"detail": "<message>"}`. Status codes: 201 created, 400 invalid/unsafe
-archive, 404 unknown project or scan, 413 size/count limit exceeded, 415 unsupported file type,
-422 missing form field.
+archive, 404 unknown project, scan, or analysis, 413 size/count limit exceeded, 415 unsupported
+file type, 422 missing form field, 429 LLM rate limit, 502 LLM provider error, 503 missing LLM
+configuration, 504 LLM timeout.
 
 ## Upload workspace and limits
 
@@ -48,6 +52,7 @@ Each upload gets an isolated directory `backend/workspace/<project_id>/`:
 - `source/` – extracted working copy (uploaded code is never executed)
 - `metadata.json` – project metadata and inspection report
 - `scan_result.json` – latest Step 3 static bug detection report
+- `analysis_result.json` – Step 4 root cause analysis report and history
 
 The workspace is git-ignored. Configure via environment variables (defaults in parentheses):
 
@@ -62,4 +67,15 @@ The workspace is git-ignored. Configure via environment variables (defaults in p
 | `ROOTPATCH_MAX_SCAN_FILES` | 1000 |
 | `ROOTPATCH_MAX_SCAN_FILE_BYTES` | 2097152 (2 MB) |
 | `ROOTPATCH_SCANNER_TIMEOUT_SECONDS` | 30 |
+| `ROOTPATCH_LLM_PROVIDER` | `gemini` (`gemini` or `openai`) |
+| `ROOTPATCH_LLM_MODEL` | `gemini-4-hydrogen` |
+| `ROOTPATCH_LLM_API_KEY` | unset (or `GEMINI_API_KEY` / `OPENAI_API_KEY`) |
+| `ROOTPATCH_LLM_BASE_URL` | provider default |
+| `ROOTPATCH_LLM_TIMEOUT_SECONDS` | 30 |
+| `ROOTPATCH_CONTEXT_LINES_BEFORE` | 20 |
+| `ROOTPATCH_CONTEXT_LINES_AFTER` | 20 |
+| `ROOTPATCH_MAX_CONTEXT_FILE_BYTES` | 524288 (512 KB) |
+| `ROOTPATCH_MAX_CONTEXT_CHARS_PER_FINDING` | 8000 |
+| `ROOTPATCH_MAX_TOTAL_CONTEXT_CHARS` | 32000 |
+| `ROOTPATCH_MAX_FINDINGS_PER_ANALYSIS` | 50 |
 | `ROOTPATCH_CORS_ORIGINS` | local Vite / port 3000 origins |

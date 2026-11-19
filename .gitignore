@@ -12,6 +12,7 @@ backend/workspace/*
 workspace/*
 RootPatch_Step3_Static_Bug_Detection.zip
 RootPatch_Step3_Static_Bug_Detection_Fixed.zip
+RootPatch_Step4_AI_Root_Cause_Analysis.zip
 
 # Secrets / local environment
 .env
