@@ -5,6 +5,7 @@ import { EmptyState, LoadingState, StateBanner } from "../components/StateBanner
 import { StatusText } from "../components/StatusText";
 import { ApiError, RootPatchApiClient } from "../services/apiClient";
 import type {
+  AnalysisReportResponse,
   PatchBatchResponse,
   PatchRecord,
   PatchReviewResponse,
@@ -16,6 +17,8 @@ interface PatchReviewPageProps {
   client: RootPatchApiClient;
   project: ProjectMetadata | null;
   patches: PatchBatchResponse | null;
+  analysis?: AnalysisReportResponse | null;
+  onPatchesGenerated?: (batch: PatchBatchResponse) => void;
   onPatchesUpdated: () => Promise<void> | void;
   onValidatePatch: (patchId: string) => void;
   onGoToFindings: () => void;
@@ -26,6 +29,8 @@ export function PatchReviewPage({
   client,
   project,
   patches,
+  analysis = null,
+  onPatchesGenerated,
   onPatchesUpdated,
   onValidatePatch,
   onGoToFindings,
@@ -43,14 +48,19 @@ export function PatchReviewPage({
     message: string;
   } | null>(null);
 
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
   const patchList: PatchRecord[] = patches?.patches ?? [];
   const effectivePatchId =
     patchList.find((p) => p.patch_id === selectedPatchId)?.patch_id ??
     patchList[0]?.patch_id ??
     null;
 
+  const projectKey = project?.project_id ?? null;
+
   useEffect(() => {
-    if (!project || !effectivePatchId) {
+    if (!projectKey || !effectivePatchId) {
       setReview(null);
       return;
     }
@@ -59,7 +69,7 @@ export function PatchReviewPage({
     setLoadingReview(true);
     setReviewError(null);
     client
-      .getPatchReview(project.project_id, effectivePatchId)
+      .getPatchReview(projectKey, effectivePatchId)
       .then((res) => {
         if (!cancelled) {
           setReview(res);
@@ -81,7 +91,7 @@ export function PatchReviewPage({
     return () => {
       cancelled = true;
     };
-  }, [client, project, effectivePatchId]);
+  }, [client, projectKey, effectivePatchId]);
 
   if (!project) {
     return (
@@ -102,20 +112,60 @@ export function PatchReviewPage({
   }
 
   if (!patches || patchList.length === 0) {
-    return (
-      <EmptyState
-        title="No Patches Generated Yet"
-        description="Run static bug detection, generate AI root-cause analyses, and generate patches before reviewing changes here."
-        action={
-          <button
-            type="button"
-            onClick={onGoToFindings}
-            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
-          >
-            Open Bugs & Root Cause
-          </button>
+    const handleGenerate = async () => {
+      setGenerating(true);
+      setGenerateError(null);
+      try {
+        const batch = await client.generatePatches(project.project_id);
+        if (onPatchesGenerated) {
+          onPatchesGenerated(batch);
+        } else {
+          await onPatchesUpdated();
         }
-      />
+      } catch (err) {
+        setGenerateError(err instanceof ApiError ? err.detail : "Patch generation failed.");
+      } finally {
+        setGenerating(false);
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        {generateError ? (
+          <StateBanner variant="error" title="Patch Generation Failed" message={generateError} />
+        ) : null}
+        {generating ? <LoadingState label="Generating validated patches..." /> : null}
+        <EmptyState
+          title="No Patches Generated Yet"
+          description={
+            analysis
+              ? "Root-cause analysis is available for this project. Generate patches to review them here."
+              : "Run static bug detection, generate AI root-cause analyses, and generate patches before reviewing changes here."
+          }
+          action={
+            analysis ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleGenerate();
+                }}
+                disabled={generating}
+                className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+              >
+                {generating ? "Generating..." : "Generate Patches"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onGoToFindings}
+                className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+              >
+                Open Bugs & Root Cause
+              </button>
+            )
+          }
+        />
+      </div>
     );
   }
 

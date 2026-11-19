@@ -2,8 +2,9 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
+from app.api.errors import http_error
 from app.core.config import Settings, get_settings
 from app.core.errors import ProjectError
 from app.schemas.validation import (
@@ -15,10 +16,6 @@ from app.services import validation_service
 from app.services.container_runner import ContainerRunner, get_container_runner
 
 router = APIRouter(prefix="/projects", tags=["validations"])
-
-
-def _http_error(exc: ProjectError) -> HTTPException:
-    return HTTPException(status_code=exc.status_code, detail=exc.message)
 
 
 @router.post(
@@ -41,7 +38,7 @@ def validate_project_patch(
             runner=runner,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get(
@@ -60,7 +57,7 @@ def get_patch_validation_history(
             settings=settings,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get(
@@ -77,7 +74,7 @@ def get_project_validation_history(
             settings=settings,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get(
@@ -96,4 +93,4 @@ def get_validation_report(
             settings=settings,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc

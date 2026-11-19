@@ -2,8 +2,9 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
+from app.api.errors import http_error
 from app.core.config import Settings, get_settings
 from app.core.errors import ProjectError
 from app.schemas.patch import (
@@ -21,10 +22,6 @@ from app.services.llm_provider import LLMProvider, get_llm_provider
 router = APIRouter(prefix="/projects", tags=["patches"])
 
 
-def _http_error(exc: ProjectError) -> HTTPException:
-    return HTTPException(status_code=exc.status_code, detail=exc.message)
-
-
 @router.post("/{project_id}/patches/generate", response_model=PatchBatchResponse)
 def generate_project_patches(
     project_id: str,
@@ -40,7 +37,7 @@ def generate_project_patches(
             provider=provider,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get("/{project_id}/patches", response_model=PatchBatchResponse)
@@ -51,7 +48,7 @@ def get_project_patches(
     try:
         return patch_service.get_latest_patches(project_id, settings)
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 # Registered before `/{project_id}/patches/{patch_id}` so "history" is not treated as a patch ID.
@@ -63,7 +60,7 @@ def get_project_patch_history(
     try:
         return patch_service.get_patch_application_history(project_id, settings)
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get("/{project_id}/patches/{patch_id}", response_model=PatchRecord)
@@ -75,7 +72,7 @@ def get_project_patch(
     try:
         return patch_service.get_patch_by_id(project_id, patch_id, settings)
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get("/{project_id}/patches/{patch_id}/review", response_model=PatchReviewResponse)
@@ -87,7 +84,7 @@ def review_project_patch(
     try:
         return patch_service.get_patch_review(project_id, patch_id, settings)
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.post("/{project_id}/patches/{patch_id}/approve", response_model=PatchRecord)
@@ -105,7 +102,7 @@ def approve_project_patch(
             comment=payload.comment if payload else None,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.post("/{project_id}/patches/{patch_id}/reject", response_model=PatchRecord)
@@ -123,7 +120,7 @@ def reject_project_patch(
             comment=payload.comment if payload else None,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.post("/{project_id}/patches/{patch_id}/apply", response_model=PatchApplyResponse)
@@ -139,4 +136,4 @@ def apply_project_patch(
             settings=settings,
         )
     except ProjectError as exc:
-        raise _http_error(exc) from exc
+        raise http_error(exc) from exc

@@ -9,6 +9,7 @@ import type {
   PatchReviewDecisionRequest,
   PatchReviewResponse,
   ProjectMetadata,
+  ProjectStatusResponse,
   RootCauseAnalysisItem,
   ScanResponse,
   StructureResponse,
@@ -21,12 +22,15 @@ import type {
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: string;
+  /** Machine-readable backend error code, e.g. "analysis_not_found". */
+  readonly code: string | null;
 
-  constructor(status: number, detail: string) {
+  constructor(status: number, detail: string, code: string | null = null) {
     super(detail);
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;
+    this.code = code;
   }
 }
 
@@ -42,25 +46,34 @@ function buildUrl(path: string, baseUrl = getApiBaseUrl()): string {
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-async function parseErrorDetail(response: Response): Promise<string> {
+async function parseErrorBody(
+  response: Response
+): Promise<{ detail: string; code: string | null }> {
+  const fallback = response.statusText || `Request failed with status ${response.status}`;
   try {
-    const data = (await response.json()) as { detail?: unknown; message?: unknown };
+    const data = (await response.json()) as {
+      detail?: unknown;
+      message?: unknown;
+      code?: unknown;
+    };
+    const code = typeof data?.code === "string" && data.code ? data.code : null;
     if (typeof data?.detail === "string" && data.detail.trim()) {
-      return data.detail;
+      return { detail: data.detail, code };
     }
     if (Array.isArray(data?.detail) && data.detail.length > 0) {
       const first = data.detail[0] as { msg?: string };
       if (first?.msg) {
-        return first.msg;
+        return { detail: first.msg, code };
       }
     }
     if (typeof data?.message === "string" && data.message.trim()) {
-      return data.message;
+      return { detail: data.message, code };
     }
+    return { detail: fallback, code };
   } catch {
     // Non-JSON error body
   }
-  return response.statusText || `Request failed with status ${response.status}`;
+  return { detail: fallback, code: null };
 }
 
 async function requestJson<T>(
@@ -87,8 +100,8 @@ async function requestJson<T>(
   }
 
   if (!response.ok) {
-    const detail = await parseErrorDetail(response);
-    throw new ApiError(response.status, detail);
+    const { detail, code } = await parseErrorBody(response);
+    throw new ApiError(response.status, detail, code);
   }
   return (await response.json()) as T;
 }
@@ -129,15 +142,19 @@ export class RootPatchApiClient {
           return;
         }
         let detail = xhr.statusText || `Upload failed with status ${xhr.status}`;
+        let code: string | null = null;
         try {
-          const parsed = JSON.parse(xhr.responseText) as { detail?: string };
+          const parsed = JSON.parse(xhr.responseText) as { detail?: string; code?: string };
           if (typeof parsed?.detail === "string" && parsed.detail.trim()) {
             detail = parsed.detail;
+          }
+          if (typeof parsed?.code === "string" && parsed.code) {
+            code = parsed.code;
           }
         } catch {
           // ignore non-JSON body
         }
-        reject(new ApiError(xhr.status, detail));
+        reject(new ApiError(xhr.status, detail, code));
       };
 
       xhr.onerror = () => {
@@ -153,6 +170,14 @@ export class RootPatchApiClient {
   getProject(projectId: string): Promise<ProjectMetadata> {
     return requestJson<ProjectMetadata>(
       `/api/projects/${encodeURIComponent(projectId)}`,
+      { method: "GET" },
+      this.baseUrl
+    );
+  }
+
+  getProjectStatus(projectId: string): Promise<ProjectStatusResponse> {
+    return requestJson<ProjectStatusResponse>(
+      `/api/projects/${encodeURIComponent(projectId)}/status`,
       { method: "GET" },
       this.baseUrl
     );

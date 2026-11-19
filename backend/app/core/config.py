@@ -17,6 +17,7 @@ _DEFAULT_CORS_ORIGINS = (
 
 # backend/app/core/config.py -> parents[2] is the `backend/` directory.
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
+_REPO_ROOT = _BACKEND_DIR.parent
 
 
 def _load_cors_origins() -> tuple[str, ...]:
@@ -38,9 +39,34 @@ def _env_int(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
+def resolve_workspace_dir(raw: str | None = None) -> Path:
+    """Resolve the RootPatch workspace directory deterministically.
+
+    Relative paths are anchored to `backend/` (or the repository root when
+    prefixed with `backend/`) rather than `os.getcwd()`, so startup from either
+    `<repo>` or `<repo>/backend` resolves to the same canonical workspace.
+    """
+    value = os.getenv("ROOTPATCH_WORKSPACE_DIR") if raw is None else raw
+    cleaned = value.strip().strip('"').strip("'") if value else ""
+    if not cleaned:
+        return (_BACKEND_DIR / "workspace").resolve()
+
+    expanded = Path(cleaned).expanduser()
+    if expanded.is_absolute():
+        return expanded.resolve()
+
+    normalized_parts = tuple(
+        part for part in cleaned.replace("\\", "/").split("/") if part and part != "."
+    )
+    if normalized_parts and normalized_parts[0] == _BACKEND_DIR.name:
+        return (_REPO_ROOT.joinpath(*normalized_parts)).resolve()
+    if normalized_parts:
+        return (_BACKEND_DIR.joinpath(*normalized_parts)).resolve()
+    return (_BACKEND_DIR / "workspace").resolve()
+
+
 def _load_workspace_dir() -> Path:
-    raw = os.getenv("ROOTPATCH_WORKSPACE_DIR")
-    return Path(raw).expanduser() if raw else _BACKEND_DIR / "workspace"
+    return resolve_workspace_dir()
 
 
 def _upload_limit() -> int:
@@ -249,6 +275,14 @@ class Settings:
     validation_python_image: str = field(default_factory=_validation_python_image)
     validation_node_image: str = field(default_factory=_validation_node_image)
     validation_network_disabled: bool = field(default_factory=_validation_network_disabled)
+
+    def __post_init__(self) -> None:
+        if not self.workspace_dir.is_absolute():
+            object.__setattr__(
+                self,
+                "workspace_dir",
+                resolve_workspace_dir(str(self.workspace_dir)),
+            )
 
 
 settings = Settings()

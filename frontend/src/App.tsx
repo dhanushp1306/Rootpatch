@@ -22,24 +22,20 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
   const [activeSection, setActiveSection] = useState<NavSection>(initialSection);
   const [preferredValidationPatchId, setPreferredValidationPatchId] = useState<string | null>(null);
 
-  const { knownProjects, activeProjectId, setActiveProjectId, registerProject } =
+  const { knownProjects, activeProjectId, setActiveProjectId, registerProject, removeKnownProject } =
     useProjectRegistry();
 
   const workspace = useProjectWorkspace(activeProjectId, client);
 
-  const handleSelectProject = async (projectId: string) => {
+  // Selecting a project only changes the active id; the workspace hook performs the
+  // (single) load, so no extra getProject request is issued here.
+  const handleSelectProject = (projectId: string) => {
     setActiveProjectId(projectId);
-    try {
-      const metadata = await client.getProject(projectId);
-      registerProject(metadata.project_id, metadata.project_name);
-    } catch {
-      // workspace hook handles and displays load error
-    }
   };
 
+  // Registering makes the new project active, which triggers exactly one workspace load.
   const handleProjectReady = (metadata: ProjectMetadata) => {
     registerProject(metadata.project_id, metadata.project_name);
-    void workspace.refreshAll();
   };
 
   const counts = {
@@ -54,9 +50,7 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
       onNavigate={setActiveSection}
       knownProjects={knownProjects}
       activeProjectId={activeProjectId}
-      onSelectProject={(id) => {
-        void handleSelectProject(id);
-      }}
+      onSelectProject={handleSelectProject}
       project={workspace.project}
       health={workspace.health}
       healthError={workspace.healthError}
@@ -67,13 +61,50 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
       counts={counts}
     >
       <div className="space-y-4">
-        {workspace.error ? (
+        {workspace.error && workspace.errorCode === "project_not_found" ? (
+          <StateBanner
+            variant="error"
+            title="Project Not Found"
+            message={workspace.error}
+            action={
+              activeProjectId ? (
+                <button
+                  type="button"
+                  onClick={() => removeKnownProject(activeProjectId)}
+                  className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-50 whitespace-nowrap"
+                >
+                  Remove from Recent Projects
+                </button>
+              ) : undefined
+            }
+          />
+        ) : workspace.error ? (
           <StateBanner
             variant="error"
             title="Workspace Error"
             message={workspace.error}
+            action={
+              <button
+                type="button"
+                onClick={() => {
+                  void workspace.refreshAll();
+                }}
+                className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-50 whitespace-nowrap"
+              >
+                Retry
+              </button>
+            }
           />
         ) : null}
+
+        {Object.entries(workspace.resourceErrors).map(([key, message]) => (
+          <StateBanner
+            key={key}
+            variant="warning"
+            title={`Could not load ${key}`}
+            message={message}
+          />
+        ))}
 
         {workspace.loading && !workspace.project && activeSection !== "upload" ? (
           <LoadingState label="Loading project workspace..." />
@@ -83,9 +114,7 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
           <DashboardPage
             workspace={workspace}
             knownProjects={knownProjects}
-            onSelectProject={(id) => {
-              void handleSelectProject(id);
-            }}
+            onSelectProject={handleSelectProject}
             onNavigate={setActiveSection}
           />
         ) : null}
@@ -115,6 +144,7 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
             project={workspace.project}
             scan={workspace.scan}
             analysis={workspace.analysis}
+            patches={workspace.patches}
             onScanComplete={workspace.setScan}
             onAnalysisComplete={workspace.setAnalysis}
             onPatchesGenerated={(batch) => {
@@ -130,6 +160,8 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
             client={client}
             project={workspace.project}
             patches={workspace.patches}
+            analysis={workspace.analysis}
+            onPatchesGenerated={workspace.setPatches}
             onPatchesUpdated={workspace.refreshAll}
             onValidatePatch={(patchId) => {
               setPreferredValidationPatchId(patchId);

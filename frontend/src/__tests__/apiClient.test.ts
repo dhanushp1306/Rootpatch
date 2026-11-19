@@ -113,3 +113,60 @@ describe("RootPatchApiClient", () => {
     expect(progressEvents).toEqual([50]);
   });
 });
+
+describe("RootPatchApiClient status + error codes", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("requests the status endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ project_id: "p1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await new RootPatchApiClient("http://localhost:8000").getProjectStatus("p1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/projects/p1/status",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("exposes the machine-readable code and keeps the legacy detail", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          detail: "No analysis results found for this project.",
+          code: "analysis_not_found",
+        }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      new RootPatchApiClient("http://localhost:8000").getAnalysis("p1")
+    ).rejects.toMatchObject({
+      status: 404,
+      detail: "No analysis results found for this project.",
+      code: "analysis_not_found",
+    });
+  });
+
+  it("leaves code null for legacy responses without one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "Not Found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
+    await expect(
+      new RootPatchApiClient("http://localhost:8000").getProjectStatus("p1")
+    ).rejects.toMatchObject({ status: 404, code: null });
+  });
+});

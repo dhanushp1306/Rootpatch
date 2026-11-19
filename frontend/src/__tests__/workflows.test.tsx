@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { ApiError, RootPatchApiClient } from "../services/apiClient";
@@ -10,6 +11,7 @@ import type {
   PatchRecord,
   PatchReviewResponse,
   ProjectMetadata,
+  ProjectStatusResponse,
   ScanResponse,
   StructureResponse,
   ValidationHistoryListResponse,
@@ -217,7 +219,23 @@ function makePatchReview(overrides: Partial<PatchReviewResponse> = {}): PatchRev
   };
 }
 
-function createMockClient() {
+interface MockOptions {
+  scan?: boolean;
+  analysis?: boolean;
+  patches?: boolean;
+  projectMissing?: boolean;
+}
+
+function notFound(detail: string, code: string): ApiError {
+  return new ApiError(404, detail, code);
+}
+
+function createMockClient(options: MockOptions = {}) {
+  const has = {
+    scan: options.scan ?? false,
+    analysis: options.analysis ?? false,
+    patches: options.patches ?? false,
+  };
   const project = makeProject();
   const structure = makeStructure();
   const scan = makeScan();
@@ -256,13 +274,51 @@ function createMockClient() {
       status: "ready",
       message: "Uploaded successfully",
     }),
-    getProject: vi.fn().mockResolvedValue(project),
+    getProject: vi.fn().mockImplementation(async () => {
+      if (options.projectMissing) throw notFound("Project not found.", "project_not_found");
+      return project;
+    }),
+    getProjectStatus: vi.fn().mockImplementation(async (): Promise<ProjectStatusResponse> => {
+      if (options.projectMissing) throw notFound("Project not found.", "project_not_found");
+      const res = (available: boolean) => ({
+        state: available ? ("available" as const) : ("missing" as const),
+        available,
+      });
+      return {
+        project_id: PROJECT_ID,
+        project_name: "sample-py-app",
+        project: res(true),
+        structure: res(true),
+        scan: res(has.scan),
+        analysis: res(has.analysis),
+        patches: res(has.patches),
+        validations: res(validations.total_runs > 0),
+        patch_counts: { total: has.patches ? 1 : 0, by_status: {} },
+        can_analyze: true,
+        can_generate_patches: has.analysis,
+      };
+    }),
     getProjectStructure: vi.fn().mockResolvedValue(structure),
-    runScan: vi.fn().mockResolvedValue(scan),
-    getScan: vi.fn().mockRejectedValue(new ApiError(404, "Scan not run")),
-    runAnalysis: vi.fn().mockResolvedValue(analysis),
-    getAnalysis: vi.fn().mockRejectedValue(new ApiError(404, "Analysis not run")),
-    generatePatches: vi.fn().mockImplementation(async (): Promise<PatchBatchResponse> => ({
+    runScan: vi.fn().mockImplementation(async () => {
+      has.scan = true;
+      return scan;
+    }),
+    getScan: vi.fn().mockImplementation(async () => {
+      if (!has.scan) throw notFound("No scan results found for this project.", "scan_not_found");
+      return scan;
+    }),
+    runAnalysis: vi.fn().mockImplementation(async () => {
+      has.analysis = true;
+      return analysis;
+    }),
+    getAnalysis: vi.fn().mockImplementation(async () => {
+      if (!has.analysis)
+        throw notFound("No analysis results found for this project.", "analysis_not_found");
+      return analysis;
+    }),
+    generatePatches: vi.fn().mockImplementation(async (): Promise<PatchBatchResponse> => {
+      has.patches = true;
+      return {
       batch_id: "batch-1",
       project_id: PROJECT_ID,
       scan_id: "scan-1",
@@ -277,8 +333,11 @@ function createMockClient() {
       patches: [currentPatch],
       rejected_patches: [],
       limitations: [],
-    })),
-    getPatches: vi.fn().mockImplementation(async (): Promise<PatchBatchResponse> => ({
+      };
+    }),
+    getPatches: vi.fn().mockImplementation(async (): Promise<PatchBatchResponse> => {
+      if (!has.patches) throw notFound("No generated patches found for this project.", "patches_not_found");
+      return {
       batch_id: "batch-1",
       project_id: PROJECT_ID,
       scan_id: "scan-1",
@@ -293,7 +352,8 @@ function createMockClient() {
       patches: [currentPatch],
       rejected_patches: [],
       limitations: [],
-    })),
+      };
+    }),
     getPatchReview: vi.fn().mockImplementation(async () => currentReview),
     approvePatch: vi.fn().mockImplementation(async () => {
       currentPatch = makePatchRecord({
@@ -531,7 +591,7 @@ describe("RootPatch Step 8 Frontend Workflows", () => {
 
   it("strips ANSI escape sequences and disables apply/validate on stale or unapplied patches", async () => {
     const user = userEvent.setup();
-    const { client } = createMockClient();
+    const { client } = createMockClient({ scan: true, analysis: true, patches: true });
 
     vi.spyOn(client, "getPatchReview").mockResolvedValue(
       makePatchReview({
@@ -574,7 +634,7 @@ describe("RootPatch Step 8 Frontend Workflows", () => {
 
   it("displays explicit BLOCKED warning when Docker is unavailable during validation", async () => {
     const user = userEvent.setup();
-    const { client } = createMockClient();
+    const { client } = createMockClient({ scan: true, analysis: true, patches: true });
 
     const appliedPatch = makePatchRecord({
       status: "applied",
@@ -648,5 +708,146 @@ describe("RootPatch Step 8 Frontend Workflows", () => {
         screen.getByText(/validation blocked: docker container runtime unavailable/i)
       ).toBeInTheDocument();
     });
+  });
+});
+
+
+function seedActiveProject() {
+  window.localStorage.setItem(
+    "rootpatch.known_projects.v1",
+    JSON.stringify([
+      { project_id: PROJECT_ID, project_name: "sample-py-app", added_at: "2026-01-01T12:00:00Z" },
+    ])
+  );
+  window.localStorage.setItem("rootpatch.active_project_id.v1", PROJECT_ID);
+}
+
+describe("API integration: status-gated optional resources", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    seedActiveProject();
+  });
+
+  it("new project: loads details + structure without requesting analysis/patches/scan (StrictMode)", async () => {
+    const { client } = createMockClient();
+    render(
+      <StrictMode>
+        <App client={client} initialSection="structure" />
+      </StrictMode>
+    );
+
+    await waitFor(() => expect(screen.getByText("app.py")).toBeInTheDocument());
+
+    expect(client.getProject).toHaveBeenCalledTimes(1);
+    expect(client.getProjectStatus).toHaveBeenCalledTimes(1);
+    expect(client.getProjectStructure).toHaveBeenCalledTimes(1);
+    expect(client.getScan).not.toHaveBeenCalled();
+    expect(client.getAnalysis).not.toHaveBeenCalled();
+    expect(client.getPatches).not.toHaveBeenCalled();
+    expect(client.getPatchHistory).not.toHaveBeenCalled();
+    expect(client.getProjectValidations).not.toHaveBeenCalled();
+  });
+
+  it("shows empty states for missing scan and patches instead of failing", async () => {
+    const user = userEvent.setup();
+    const { client } = createMockClient();
+    render(<App client={client} initialSection="findings" />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/static scan not yet executed/i)).toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: /scan and analyze/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^patch review/i }));
+    expect(await screen.findByText(/no patches generated yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open bugs & root cause/i })).toBeInTheDocument();
+    expect(client.getAnalysis).not.toHaveBeenCalled();
+    expect(client.getPatches).not.toHaveBeenCalled();
+  });
+
+  it("analyze runs a real scan first, refreshes analysis state, then offers Generate Patches", async () => {
+    const user = userEvent.setup();
+    const { client } = createMockClient();
+    render(<App client={client} initialSection="findings" />);
+
+    await user.click(await screen.findByRole("button", { name: /analyze root causes/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/untrusted command string interpolated into shell subprocess/i)
+      ).toBeInTheDocument()
+    );
+    expect(client.runScan).toHaveBeenCalledTimes(1);
+    expect(client.runAnalysis).toHaveBeenCalledTimes(1);
+
+    // status refreshed after analysis, patches still missing -> Generate Patches action
+    const generate = await screen.findByRole("button", { name: /^generate patches$/i });
+    expect(vi.mocked(client.getProjectStatus).mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(client.getPatches).not.toHaveBeenCalled();
+
+    await user.click(generate);
+    await waitFor(() => expect(client.generatePatches).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /^generate patches$/i })).not.toBeInTheDocument()
+    );
+  });
+
+  it("patch page offers Generate Patches when analysis exists but patches do not", async () => {
+    const user = userEvent.setup();
+    const { client } = createMockClient({ scan: true, analysis: true });
+    render(<App client={client} initialSection="patches" />);
+
+    const button = await screen.findByRole("button", { name: /^generate patches$/i });
+    expect(client.getPatches).not.toHaveBeenCalled();
+    await user.click(button);
+
+    await waitFor(() =>
+      expect(screen.getByText(/before \/ after comparison/i)).toBeInTheDocument()
+    );
+    expect(client.generatePatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a proper error for a genuinely missing project", async () => {
+    const { client } = createMockClient({ projectMissing: true });
+    render(<App client={client} initialSection="dashboard" />);
+
+    expect(await screen.findByText(/project not found/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove from recent projects/i })).toBeInTheDocument();
+    expect(client.getAnalysis).not.toHaveBeenCalled();
+    expect(client.getPatches).not.toHaveBeenCalled();
+  });
+
+  it("existing project with completed results loads each resource exactly once and survives reload", async () => {
+    const { client } = createMockClient({ scan: true, analysis: true, patches: true });
+    const first = render(
+      <StrictMode>
+        <App client={client} initialSection="patches" />
+      </StrictMode>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/before \/ after comparison/i)).toBeInTheDocument()
+    );
+    expect(client.getScan).toHaveBeenCalledTimes(1);
+    expect(client.getAnalysis).toHaveBeenCalledTimes(1);
+    expect(client.getPatches).toHaveBeenCalledTimes(1);
+    expect(client.getPatchHistory).toHaveBeenCalledTimes(1);
+
+    // simulate a browser refresh: remount; results are still available
+    first.unmount();
+    render(<App client={client} initialSection="patches" />);
+    await waitFor(() =>
+      expect(screen.getByText(/before \/ after comparison/i)).toBeInTheDocument()
+    );
+  });
+
+  it("surfaces a genuine backend failure of a stored resource", async () => {
+    const { client } = createMockClient({ scan: true, analysis: true });
+    vi.spyOn(client, "getAnalysis").mockRejectedValue(
+      new ApiError(500, "Stored analysis results are corrupted or unreadable.", "analysis_error")
+    );
+    render(<App client={client} initialSection="findings" />);
+    expect(await screen.findByText(/could not load analysis/i)).toBeInTheDocument();
+    expect(screen.getByText(/corrupted or unreadable/i)).toBeInTheDocument();
   });
 });

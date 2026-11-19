@@ -55,6 +55,7 @@ npm run build   # Production TypeScript check & Vite bundle into frontend/dist
 | POST | `/api/projects/upload` | Upload a `.zip` (multipart field `file`); safely extracts and inspects it |
 | GET | `/api/projects/{project_id}` | Project metadata + inspection report |
 | GET | `/api/projects/{project_id}/structure` | Directory/file tree |
+| GET | `/api/projects/{project_id}/status` | Availability of project, structure, scan, analysis, patches and validations (never 404s for merely-missing optional data) |
 | POST | `/api/projects/{project_id}/scan` | Run static bug detection (AST, Ruff, Bandit) on uploaded Python code |
 | GET | `/api/projects/{project_id}/scan` | Retrieve the latest saved scan report for a project |
 | POST | `/api/projects/{project_id}/analyze` | Generate AI root cause analysis from the latest scan results |
@@ -78,6 +79,27 @@ archive, 404 unknown project, scan, analysis, patch, or validation report, 409 i
 state (e.g. unapplied patch validation) or stale target, 413 size/count limit exceeded, 415
 unsupported file type, 422 invalid diff, unsafe command override, or missing form field, 429 LLM
 rate limit, 502 LLM provider error, 503 missing LLM configuration, 504 LLM timeout.
+
+## Error codes and project status
+
+Every API error keeps the legacy `detail` string and adds a machine-readable `code`:
+
+```json
+{ "detail": "No analysis results found for this project.", "code": "analysis_not_found" }
+```
+
+Not-found codes: `project_not_found`, `scan_not_found`, `analysis_not_found`, `analysis_item_not_found`,
+`patches_not_found` (nothing generated yet), `patch_not_found` (unknown patch id), `validation_not_found`.
+Other codes include `llm_not_configured`, `llm_rate_limited`, `llm_timeout`, `llm_provider_error`,
+`patch_conflict`, `patch_invalid`, `validation_isolation_unavailable`, `analysis_error`, `scan_error`, `patch_error`.
+
+`GET /api/projects/{id}/status` reports each resource as `available`, `missing` (not generated yet — normal for
+new projects) or `error` (stored artifact exists but is unreadable). Nothing is fabricated.
+
+The frontend loads the project and its status first, and requests scan / analysis / patches / patch history /
+validations **only when the status says they exist**. Loads are de-duplicated (React StrictMode) and a token
+guard prevents a slow response for a previous project from overwriting the active one. Against an older backend
+without `/status`, it falls back to 404-tolerant probing.
 
 ## Upload workspace and limits
 

@@ -1,5 +1,5 @@
 import { Bug, Loader2, Search, Sparkles, Wrench } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EmptyState, StateBanner } from "../components/StateBanner";
 import { StatusText } from "../components/StatusText";
 import { ApiError, RootPatchApiClient } from "../services/apiClient";
@@ -18,6 +18,7 @@ interface FindingsPageProps {
   project: ProjectMetadata | null;
   scan: ScanResponse | null;
   analysis: AnalysisReportResponse | null;
+  patches?: PatchBatchResponse | null;
   onScanComplete: (scan: ScanResponse) => void;
   onAnalysisComplete: (analysis: AnalysisReportResponse) => void;
   onPatchesGenerated: (batch: PatchBatchResponse) => void;
@@ -30,6 +31,7 @@ export function FindingsPage({
   project,
   scan,
   analysis,
+  patches = null,
   onScanComplete,
   onAnalysisComplete,
   onPatchesGenerated,
@@ -47,6 +49,14 @@ export function FindingsPage({
   const [toolFilter, setToolFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+
+  const projectKey = project?.project_id ?? null;
+  useEffect(() => {
+    // Never carry banners or in-progress filters over to a different project.
+    setActionError(null);
+    setActionSuccess(null);
+    setSelectedFindingId(null);
+  }, [projectKey]);
 
   const analysisByFindingId = useMemo(() => {
     const map = new Map<string, RootCauseAnalysisItem>();
@@ -116,6 +126,11 @@ export function FindingsPage({
     setActionError(null);
     setActionSuccess(null);
     try {
+      // Analysis consumes scan results; run a real scan first when none exists yet.
+      if (!scan) {
+        const freshScan = await client.runScan(project.project_id);
+        onScanComplete(freshScan);
+      }
       const result = await client.runAnalysis(project.project_id);
       onAnalysisComplete(result);
       setActionSuccess(
@@ -190,7 +205,7 @@ export function FindingsPage({
           <button
             type="button"
             onClick={handleRunAnalysis}
-            disabled={!scan || runningAnalysis}
+            disabled={runningAnalysis}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap shrink-0"
           >
             {runningAnalysis ? (
@@ -238,10 +253,65 @@ export function FindingsPage({
       {!scan ? (
         <EmptyState
           title="Static Scan Not Yet Executed"
-          description="Click Run Static Scan to inspect Python files with AST, Ruff, and Bandit."
+          description="Click Run Static Scan to inspect Python files with AST, Ruff, and Bandit, or scan and analyze root causes in one step."
+          action={
+            <button
+              type="button"
+              onClick={handleRunAnalysis}
+              disabled={runningAnalysis || runningScan}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap"
+            >
+              {runningAnalysis ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
+              )}
+              <span>Scan and Analyze</span>
+            </button>
+          }
         />
       ) : (
         <>
+          {!analysis ? (
+            <StateBanner
+              variant="info"
+              title="Root-cause analysis has not been generated"
+              message="Run AI analysis to explain each finding's root cause. Patches can be generated afterwards."
+              action={
+                <button
+                  type="button"
+                  onClick={handleRunAnalysis}
+                  disabled={runningAnalysis}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {runningAnalysis ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  <span>{runningAnalysis ? "Analyzing..." : "Analyze Now"}</span>
+                </button>
+              }
+            />
+          ) : !patches || patches.patches.length === 0 ? (
+            <StateBanner
+              variant="info"
+              title="Patches have not been generated"
+              message="Root-cause analysis is available. Generate validated patches for the analyzed findings."
+              action={
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePatches()}
+                  disabled={generatingBatch}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {generatingBatch ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  <span>{generatingBatch ? "Generating..." : "Generate Patches"}</span>
+                </button>
+              }
+            />
+          ) : null}
+
           {/* Scanner breakdown */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {Object.entries(scan.scanner_details).map(([toolName, details]) => (

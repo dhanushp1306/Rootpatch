@@ -91,3 +91,41 @@ class StructureResponse(BaseModel):
     total_nodes: int
     truncated: bool
     tree: StructureNode
+
+
+ResourceState = Literal["available", "missing", "error"]
+
+
+class ResourceStatus(BaseModel):
+    """Availability of one optional project resource.
+
+    `missing` means it has not been generated yet (normal for new projects);
+    `error` means a stored artifact exists but could not be read.
+    """
+
+    state: ResourceState
+    available: bool
+    count: Optional[int] = None
+    updated_at: Optional[str] = None
+    detail: Optional[str] = None
+
+
+class PatchStatusCounts(BaseModel):
+    total: int = 0
+    by_status: Dict[str, int] = Field(default_factory=dict)
+
+
+class ProjectStatusResponse(BaseModel):
+    """Lightweight status used by the UI before requesting optional resources."""
+
+    project_id: str
+    project_name: str
+    project: ResourceStatus
+    structure: ResourceStatus
+    scan: ResourceStatus
+    analysis: ResourceStatus
+    patches: ResourceStatus
+    validations: ResourceStatus
+    patch_counts: PatchStatusCounts = Field(default_factory=PatchStatusCounts)
+    can_analyze: bool
+    can_generate_patches: bool

@@ -459,3 +459,27 @@ export interface ValidationHistoryListResponse {
   error_count: number;
   validations: ValidationReportResponse[];
 }
+
+export type ResourceState = "available" | "missing" | "error";
+
+export interface ResourceStatus {
+  state: ResourceState;
+  available: boolean;
+  count?: number | null;
+  updated_at?: string | null;
+  detail?: string | null;
+}
+
+export interface ProjectStatusResponse {
+  project_id: string;
+  project_name: string;
+  project: ResourceStatus;
+  structure: ResourceStatus;
+  scan: ResourceStatus;
+  analysis: ResourceStatus;
+  patches: ResourceStatus;
+  validations: ResourceStatus;
+  patch_counts: { total: number; by_status: Record<string, number> };
+  can_analyze: boolean;
+  can_generate_patches: boolean;
+}
