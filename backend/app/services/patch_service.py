@@ -1,39 +1,52 @@
-"""Step 5 Automated Patch Generation orchestration and persistence.
+"""Step 5 & Step 6 Automated Patch Generation, Review, Approval, and Safe Application.
 
 Consumes Step 3 static scan results and Step 4 AI root cause analysis, builds
 bounded workspace-confined context, requests minimal unified diffs via the Step 4
-LLM provider abstraction, validates every diff strictly in memory without modifying
-source files on disk, and persists patch metadata/diffs separately.
+LLM provider abstraction, validates every diff strictly in memory, and supports
+explicit developer review, approval/rejection, guarded atomic application, and
+application audit history without ever executing uploaded code.
 """
 
 import hashlib
 import json
+import os
 import re
+import tempfile
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from app.core.config import Settings
 from app.core.errors import (
+    AnalysisError,
     AnalysisNotFoundError,
     LLMConfigurationError,
     LLMProviderError,
+    PatchApplicationError,
+    PatchConflictError,
     PatchError,
     PatchNotFoundError,
     PatchValidationError,
     ProjectNotFoundError,
+    ScanError,
+    ScanNotFoundError,
 )
 from app.schemas.analysis import AnalysisReportResponse, RootCauseAnalysisItem
 from app.schemas.patch import (
     LLMPatchBatchPayload,
     LLMPatchItemPayload,
+    PatchApplicationHistoryEntry,
+    PatchApplicationHistoryResponse,
+    PatchApplyResponse,
     PatchBatchResponse,
     PatchGenerateRequest,
     PatchHistoryStore,
     PatchRecord,
+    PatchReviewResponse,
     PatchValidationInfo,
     RejectedPatchDetail,
 )
@@ -48,6 +61,7 @@ from app.services.context_service import (
     sanitize_untrusted_text,
 )
 from app.services.diff_validator import (
+    apply_unified_diff_in_memory,
     normalize_expected_rel_path,
     resolve_workspace_target_file,
     validate_and_preview_unified_diff,
@@ -56,10 +70,17 @@ from app.services.inspection_service import find_project_root
 from app.services.llm_provider import LLMProvider, build_llm_provider, strip_json_fences
 from app.services.scan_service import get_latest_scan
 from app.services.upload_service import SOURCE_DIR, _project_dir, load_project
+from app.utils.file_utils import is_within_directory
 
 PATCH_RESULT_NAME = "patches_result.json"
+PATCH_HISTORY_NAME = "patch_history.json"
+BACKUPS_DIR = "backups"
 MAX_PATCH_HISTORY = 20
+MAX_APPLICATION_HISTORY = 200
 _PATCH_ID_PATTERN = re.compile(r"^patch-[0-9a-f]{12}$")
+
+_LOCK_GUARD = threading.Lock()
+_PROJECT_LOCKS: Dict[str, threading.RLock] = {}
 
 _PATCH_SYSTEM_PROMPT = """You are a senior software security and reliability engineer for RootPatch.
 Your task is to generate minimal, focused, evidence-based unified diffs to fix diagnosed static bugs.
@@ -91,8 +112,40 @@ CRITICAL SECURITY & DIFF RULES:
 }"""
 
 
+def _get_project_lock(project_id: str) -> threading.RLock:
+    with _LOCK_GUARD:
+        lock = _PROJECT_LOCKS.get(project_id)
+        if lock is None:
+            lock = threading.RLock()
+            _PROJECT_LOCKS[project_id] = lock
+        return lock
+
+
 def _is_valid_patch_id(patch_id: str) -> bool:
     return bool(_PATCH_ID_PATTERN.fullmatch(patch_id))
+
+
+def _atomic_write_bytes(target: Path, content: bytes) -> None:
+    """Write raw bytes atomically via a temporary file in the same directory + os.replace."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(target.parent), prefix=f".{target.name}.", suffix=".tmp"
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, target)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def _write_target_file_bytes(target: Path, content: bytes) -> None:
+    """Dedicated atomic writer for target workspace files during patch application."""
+    _atomic_write_bytes(target, content)
 
 
 def _load_patch_history(patch_path: Path) -> Optional[PatchHistoryStore]:
@@ -109,23 +162,107 @@ def _load_patch_history(patch_path: Path) -> Optional[PatchHistoryStore]:
         raise PatchError("Stored patch results are corrupted or unreadable.", 500) from exc
 
 
-def _persist_patch_batch(project_dir: Path, batch: PatchBatchResponse) -> None:
-    patch_path = project_dir / PATCH_RESULT_NAME
-    existing_history: List[PatchBatchResponse] = []
-    if patch_path.is_file():
-        try:
-            existing_store = _load_patch_history(patch_path)
-            if existing_store is not None:
-                existing_history = list(existing_store.history)
-        except PatchError:
-            existing_history = []
+def _persist_patch_batch(project_id: str, project_dir: Path, batch: PatchBatchResponse) -> None:
+    with _get_project_lock(project_id):
+        patch_path = project_dir / PATCH_RESULT_NAME
+        existing_history: List[PatchBatchResponse] = []
+        if patch_path.is_file():
+            try:
+                existing_store = _load_patch_history(patch_path)
+                if existing_store is not None:
+                    existing_history = list(existing_store.history)
+            except PatchError:
+                existing_history = []
 
-    updated_history = [batch, *existing_history][:MAX_PATCH_HISTORY]
-    store = PatchHistoryStore(latest=batch, history=updated_history)
+        updated_history = [batch, *existing_history][:MAX_PATCH_HISTORY]
+        store = PatchHistoryStore(latest=batch, history=updated_history)
+        try:
+            _atomic_write_text(patch_path, store.model_dump_json(indent=2))
+        except OSError as exc:
+            raise PatchError("Failed to persist generated patch results.", 500) from exc
+
+
+def _update_patch_record_in_store(project_dir: Path, updated: PatchRecord) -> None:
+    """Persist an updated `PatchRecord` across `latest` and `history` batches."""
+    patch_path = project_dir / PATCH_RESULT_NAME
+    store = _load_patch_history(patch_path)
+    if store is None:
+        raise PatchNotFoundError("Patch not found.")
+
+    found = False
+    new_latest_patches: List[PatchRecord] = []
+    for rec in store.latest.patches:
+        if rec.patch_id == updated.patch_id:
+            new_latest_patches.append(updated)
+            found = True
+        else:
+            new_latest_patches.append(rec)
+    new_latest = store.latest.model_copy(update={"patches": new_latest_patches})
+
+    new_history: List[PatchBatchResponse] = []
+    for batch in store.history:
+        replaced_batch_patches: List[PatchRecord] = []
+        for rec in batch.patches:
+            if rec.patch_id == updated.patch_id:
+                replaced_batch_patches.append(updated)
+                found = True
+            else:
+                replaced_batch_patches.append(rec)
+        new_history.append(batch.model_copy(update={"patches": replaced_batch_patches}))
+
+    if not found:
+        raise PatchNotFoundError("Patch not found.")
+
+    new_store = PatchHistoryStore(latest=new_latest, history=new_history)
     try:
-        _atomic_write_text(patch_path, store.model_dump_json(indent=2))
+        _atomic_write_text(patch_path, new_store.model_dump_json(indent=2))
     except OSError as exc:
-        raise PatchError("Failed to persist generated patch results.", 500) from exc
+        raise PatchError("Failed to persist updated patch state.", 500) from exc
+
+
+_HISTORY_LIST_ADAPTER = TypeAdapter(List[PatchApplicationHistoryEntry])
+
+
+def _load_application_history(history_path: Path) -> List[PatchApplicationHistoryEntry]:
+    if not history_path.is_file():
+        return []
+    try:
+        raw = history_path.read_text(encoding="utf-8")
+        return _HISTORY_LIST_ADAPTER.validate_json(raw)
+    except (OSError, ValueError, ValidationError) as exc:
+        raise PatchError("Stored patch application history is corrupted or unreadable.", 500) from exc
+
+
+def _append_application_history(
+    project_dir: Path, entry: PatchApplicationHistoryEntry
+) -> None:
+    history_path = project_dir / PATCH_HISTORY_NAME
+    existing = _load_application_history(history_path)
+    updated = [entry, *existing][:MAX_APPLICATION_HISTORY]
+    try:
+        _atomic_write_text(
+            history_path,
+            _HISTORY_LIST_ADAPTER.dump_json(updated, indent=2).decode("utf-8"),
+        )
+    except OSError as exc:
+        raise PatchError("Failed to persist patch application history.", 500) from exc
+
+
+def _find_patch_record(project_dir: Path, patch_id: str) -> PatchRecord:
+    if not _is_valid_patch_id(patch_id):
+        raise PatchNotFoundError("Patch not found.")
+
+    patch_path = project_dir / PATCH_RESULT_NAME
+    store = _load_patch_history(patch_path)
+    if store is None:
+        raise PatchNotFoundError("Patch not found.")
+
+    for batch in [store.latest, *store.history]:
+        for record in batch.patches:
+            if record.patch_id == patch_id:
+                return record
+
+    raise PatchNotFoundError("Patch not found.")
 
 
 def _resolve_targets(
@@ -307,7 +444,7 @@ def generate_patches(
                 "No static analysis findings were present in the latest scan; patch generation was skipped."
             ],
         )
-        _persist_patch_batch(project_dir, empty_batch)
+        _persist_patch_batch(project_id, project_dir, empty_batch)
         return empty_batch
 
     active_provider = provider
@@ -458,6 +595,8 @@ def generate_patches(
                 line_number=finding.line_number,
                 rule_id=finding.rule_id,
                 status="generated",
+                approval_status="pending",
+                application_status="not_applied",
                 applied=False,
                 summary=redact_sensitive_text(llm_item.summary),
                 explanation=redact_sensitive_text(llm_item.explanation),
@@ -522,7 +661,7 @@ def generate_patches(
         limitations=limitations,
     )
 
-    _persist_patch_batch(project_dir, batch)
+    _persist_patch_batch(project_id, project_dir, batch)
     return batch
 
 
@@ -541,17 +680,599 @@ def get_patch_by_id(
 ) -> PatchRecord:
     """Retrieve a single persisted patch record by `patch_id`."""
     load_project(project_id, settings)
-    if not _is_valid_patch_id(patch_id):
-        raise PatchNotFoundError("Patch not found.")
+    project_dir = _project_dir(project_id, settings)
+    return _find_patch_record(project_dir, patch_id)
 
-    patch_path = _project_dir(project_id, settings) / PATCH_RESULT_NAME
-    store = _load_patch_history(patch_path)
-    if store is None:
-        raise PatchNotFoundError("Patch not found.")
 
-    for batch in [store.latest, *store.history]:
-        for record in batch.patches:
-            if record.patch_id == patch_id:
-                return record
+# --- Step 6: Patch Review, Approval, Rejection, Safe Application, and History ---
 
-    raise PatchNotFoundError("Patch not found.")
+
+def _sanitize_review_comment(comment: Optional[str]) -> Optional[str]:
+    if comment is None:
+        return None
+    cleaned = sanitize_untrusted_text(comment).strip()[:500]
+    return cleaned or None
+
+
+def _bounded_redacted_preview(text: str, settings: Settings) -> str:
+    redacted = redact_sensitive_text(text)
+    limit = settings.max_total_context_chars
+    if len(redacted) > limit:
+        return redacted[:limit] + "\n... [preview truncated due to size limit]"
+    return redacted
+
+
+def _inspect_target_no_symlinks(
+    project_root: Path, norm_path: str
+) -> Tuple[Path, Optional[str]]:
+    """Verify path confinement and absence of symlinks without failing if file is missing.
+
+    Returns (resolved_target_path, missing_reason_if_absent).
+    Raises PatchValidationError on any traversal, sensitive path, or symlink escape.
+    """
+    resolved_root = project_root.resolve()
+    cursor = resolved_root
+    for part in norm_path.split("/"):
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise PatchValidationError("Target path traverses or references a symbolic link.")
+
+    resolved_target = cursor.resolve()
+    if not is_within_directory(resolved_root, resolved_target):
+        raise PatchValidationError("Target file escapes the approved project workspace.")
+    if not resolved_target.exists():
+        return resolved_target, "Target source file no longer exists in the workspace."
+    if not resolved_target.is_file():
+        return resolved_target, "Target path is no longer a regular file."
+    return resolved_target, None
+
+
+def _resolve_backup_path(project_dir: Path, patch_id: str, norm_path: str) -> Tuple[Path, str]:
+    backups_root = (project_dir / BACKUPS_DIR).resolve()
+    rel_backup = f"{BACKUPS_DIR}/{patch_id}/{norm_path}"
+    candidate = (project_dir / rel_backup).resolve()
+    if not is_within_directory(backups_root, candidate):
+        raise PatchValidationError("Backup target escapes project backup directory.")
+    return candidate, rel_backup
+
+
+def get_patch_review(
+    project_id: str, patch_id: str, settings: Settings
+) -> PatchReviewResponse:
+    """Return full developer review context for `patch_id` without modifying files."""
+    load_project(project_id, settings)
+    project_dir = _project_dir(project_id, settings)
+    source_dir = project_dir / SOURCE_DIR
+    if not source_dir.is_dir():
+        raise ProjectNotFoundError()
+    project_root = find_project_root(source_dir)
+
+    record = _find_patch_record(project_dir, patch_id)
+
+    finding_title: Optional[str] = None
+    finding_severity: Optional[str] = None
+    root_cause: Optional[str] = None
+    try:
+        scan = get_latest_scan(project_id, settings)
+        match_f = next((f for f in scan.findings if f.id == record.finding_id), None)
+        if match_f is not None:
+            finding_title = match_f.title
+            finding_severity = match_f.severity
+    except (ScanError, ScanNotFoundError, ProjectNotFoundError):
+        pass
+    try:
+        analysis = get_analysis_by_id(project_id, record.analysis_id, settings)
+        root_cause = analysis.root_cause
+    except (AnalysisError, AnalysisNotFoundError, ProjectNotFoundError):
+        pass
+
+    is_stale = record.status == "stale"
+    stale_reason: Optional[str] = (
+        "Target source file changed since patch generation." if is_stale else None
+    )
+    original_code: Optional[str] = None
+    proposed_code: Optional[str] = None
+
+    try:
+        norm_path = normalize_expected_rel_path(record.file_path)
+        target_file, missing_reason = _inspect_target_no_symlinks(project_root, norm_path)
+
+        if record.status == "applied":
+            is_stale = False
+            stale_reason = None
+            if record.backup_path:
+                backup_candidate = (project_dir / record.backup_path).resolve()
+                if (
+                    is_within_directory((project_dir / BACKUPS_DIR).resolve(), backup_candidate)
+                    and backup_candidate.is_file()
+                ):
+                    try:
+                        original_code = _bounded_redacted_preview(
+                            backup_candidate.read_bytes().decode("utf-8"), settings
+                        )
+                    except (OSError, UnicodeDecodeError):
+                        original_code = record.original_snippet
+            if original_code is None:
+                original_code = record.original_snippet
+
+            if missing_reason is None:
+                try:
+                    raw_curr = target_file.read_bytes()
+                    if (
+                        record.applied_file_sha256
+                        and hashlib.sha256(raw_curr).hexdigest() == record.applied_file_sha256
+                    ):
+                        proposed_code = _bounded_redacted_preview(
+                            raw_curr.decode("utf-8"), settings
+                        )
+                except (OSError, UnicodeDecodeError):
+                    pass
+            if proposed_code is None:
+                proposed_code = record.proposed_snippet
+        else:
+            if missing_reason is not None:
+                is_stale = True
+                stale_reason = missing_reason
+            else:
+                raw_curr = target_file.read_bytes()
+                curr_sha = hashlib.sha256(raw_curr).hexdigest()
+                if curr_sha != record.validation.original_file_sha256:
+                    is_stale = True
+                    stale_reason = (
+                        "Target source file has changed since this patch was generated."
+                    )
+                    original_code = record.original_snippet
+                else:
+                    orig_text = raw_curr.decode("utf-8")
+                    original_code = _bounded_redacted_preview(orig_text, settings)
+                    _val_res, patched_text = apply_unified_diff_in_memory(
+                        diff_text=record.unified_diff,
+                        project_root=project_root,
+                        expected_rel_path=norm_path,
+                        settings=settings,
+                    )
+                    proposed_code = _bounded_redacted_preview(patched_text, settings)
+    except (PatchValidationError, OSError, UnicodeDecodeError) as exc:
+        if record.status != "applied":
+            is_stale = True
+            stale_reason = (
+                exc.message if isinstance(exc, PatchValidationError) else "Source preview unavailable."
+            )
+            original_code = original_code or record.original_snippet
+
+    effective_stale = (record.status == "stale") or (is_stale and not record.applied)
+    can_approve = (
+        record.status == "generated"
+        and record.validation.is_valid
+        and not effective_stale
+    )
+    can_reject = (
+        record.status in ("generated", "approved", "application_failed", "stale")
+        and not record.applied
+    )
+    can_apply = (
+        record.status == "approved"
+        and record.approval_status == "approved"
+        and record.validation.is_valid
+        and not effective_stale
+        and not record.applied
+    )
+
+    return PatchReviewResponse(
+        patch_id=record.patch_id,
+        project_id=record.project_id,
+        scan_id=record.scan_id,
+        analysis_id=record.analysis_id,
+        finding_id=record.finding_id,
+        file_path=record.file_path,
+        line_number=record.line_number,
+        rule_id=record.rule_id,
+        status=record.status,
+        approval_status=record.approval_status,
+        application_status=record.application_status,
+        applied=record.applied,
+        summary=record.summary,
+        explanation=record.explanation,
+        confidence=record.confidence,
+        unified_diff=record.unified_diff,
+        original_snippet=record.original_snippet,
+        proposed_snippet=record.proposed_snippet,
+        original_code=original_code,
+        proposed_code=proposed_code,
+        is_stale=effective_stale,
+        stale_reason=stale_reason,
+        can_approve=can_approve,
+        can_reject=can_reject,
+        can_apply=can_apply,
+        validation=record.validation,
+        generated_at=record.generated_at,
+        reviewed_at=record.reviewed_at,
+        review_note=record.review_note,
+        applied_at=record.applied_at,
+        applied_file_sha256=record.applied_file_sha256,
+        application_error=record.application_error,
+        finding_title=finding_title,
+        finding_severity=finding_severity,
+        root_cause=root_cause,
+    )
+
+
+def approve_patch(
+    project_id: str,
+    patch_id: str,
+    settings: Settings,
+    comment: Optional[str] = None,
+) -> PatchRecord:
+    """Explicitly approve a validated generated patch without applying it."""
+    load_project(project_id, settings)
+    project_dir = _project_dir(project_id, settings)
+    source_dir = project_dir / SOURCE_DIR
+    if not source_dir.is_dir():
+        raise ProjectNotFoundError()
+    project_root = find_project_root(source_dir)
+
+    with _get_project_lock(project_id):
+        record = _find_patch_record(project_dir, patch_id)
+        if not record.validation.is_valid:
+            raise PatchValidationError(
+                "Only successfully validated patches can be approved."
+            )
+
+        if record.status == "approved":
+            return record
+        if record.status == "rejected":
+            raise PatchConflictError(
+                "Rejected patches cannot be approved; generate a new patch instead."
+            )
+        if record.status == "applied" or record.applied:
+            raise PatchConflictError("Patch has already been applied.")
+        if record.status == "stale":
+            raise PatchConflictError(
+                "Stale patches cannot be approved because the target source file changed."
+            )
+        if record.status == "application_failed":
+            raise PatchConflictError(
+                "Patches that failed application cannot be re-approved; generate a new patch."
+            )
+
+        # Verify source file is still intact and unchanged before approving.
+        norm_path = normalize_expected_rel_path(record.file_path)
+        target_file, missing_reason = _inspect_target_no_symlinks(project_root, norm_path)
+        if missing_reason is not None:
+            stale_rec = record.model_copy(
+                update={
+                    "status": "stale",
+                    "application_status": "stale",
+                    "application_error": missing_reason,
+                }
+            )
+            _update_patch_record_in_store(project_dir, stale_rec)
+            raise PatchConflictError(f"Patch is stale: {missing_reason}")
+
+        current_sha = hashlib.sha256(target_file.read_bytes()).hexdigest()
+        if current_sha != record.validation.original_file_sha256:
+            stale_rec = record.model_copy(
+                update={
+                    "status": "stale",
+                    "application_status": "stale",
+                    "application_error": "Target source file changed since patch generation.",
+                }
+            )
+            _update_patch_record_in_store(project_dir, stale_rec)
+            raise PatchConflictError(
+                "Patch is stale: target source file has changed since patch generation."
+            )
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        clean_note = _sanitize_review_comment(comment)
+        approved = record.model_copy(
+            update={
+                "status": "approved",
+                "approval_status": "approved",
+                "reviewed_at": now_iso,
+                "review_note": clean_note if clean_note is not None else record.review_note,
+            }
+        )
+        _update_patch_record_in_store(project_dir, approved)
+        return approved
+
+
+def reject_patch(
+    project_id: str,
+    patch_id: str,
+    settings: Settings,
+    comment: Optional[str] = None,
+) -> PatchRecord:
+    """Explicitly reject a patch so it remains unapplied."""
+    load_project(project_id, settings)
+    project_dir = _project_dir(project_id, settings)
+
+    with _get_project_lock(project_id):
+        record = _find_patch_record(project_dir, patch_id)
+        if record.status == "applied" or record.applied:
+            raise PatchConflictError("An already applied patch cannot be rejected.")
+        if record.status == "rejected":
+            return record
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        clean_note = _sanitize_review_comment(comment)
+        rejected = record.model_copy(
+            update={
+                "status": "rejected",
+                "approval_status": "rejected",
+                "applied": False,
+                "reviewed_at": now_iso,
+                "review_note": clean_note if clean_note is not None else record.review_note,
+            }
+        )
+        _update_patch_record_in_store(project_dir, rejected)
+        return rejected
+
+
+def apply_patch(
+    project_id: str, patch_id: str, settings: Settings
+) -> PatchApplyResponse:
+    """Safely revalidate and atomically apply an explicitly approved patch."""
+    load_project(project_id, settings)
+    project_dir = _project_dir(project_id, settings)
+    source_dir = project_dir / SOURCE_DIR
+    if not source_dir.is_dir():
+        raise ProjectNotFoundError()
+    project_root = find_project_root(source_dir)
+
+    with _get_project_lock(project_id):
+        record = _find_patch_record(project_dir, patch_id)
+
+        if record.applied or record.status == "applied":
+            raise PatchConflictError("Patch has already been applied.")
+        if record.status == "rejected" or record.approval_status == "rejected":
+            raise PatchConflictError("Rejected patches cannot be applied.")
+        if record.status == "stale":
+            raise PatchConflictError(
+                "Patch is stale because the target source file changed since patch generation."
+            )
+        if record.status == "application_failed":
+            raise PatchConflictError(
+                "Patch previously failed application; generate a new patch instead."
+            )
+        if record.status != "approved" or record.approval_status != "approved":
+            raise PatchConflictError(
+                "Patch must be explicitly approved before it can be applied."
+            )
+        if not record.validation.is_valid:
+            raise PatchValidationError("Only validated patches can be applied.")
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        base_sha = record.validation.original_file_sha256
+
+        # 1. Enforce path confinement and symlink rejection before touching anything.
+        try:
+            norm_path = normalize_expected_rel_path(record.file_path)
+            target_file, missing_reason = _inspect_target_no_symlinks(project_root, norm_path)
+        except PatchValidationError as exc:
+            failed_rec = record.model_copy(
+                update={
+                    "status": "application_failed",
+                    "application_status": "failed",
+                    "applied": False,
+                    "application_error": exc.message,
+                }
+            )
+            _update_patch_record_in_store(project_dir, failed_rec)
+            _append_application_history(
+                project_dir,
+                PatchApplicationHistoryEntry(
+                    history_id=f"hist-{uuid.uuid4().hex[:12]}",
+                    patch_id=record.patch_id,
+                    project_id=project_id,
+                    finding_id=record.finding_id,
+                    file_path=record.file_path,
+                    applied_at=now_iso,
+                    previous_file_sha256=base_sha,
+                    new_file_sha256=None,
+                    result="failed",
+                    error_message=exc.message,
+                ),
+            )
+            raise
+
+        # 2. Check target existence and verify original source hash (stale detection).
+        if missing_reason is not None:
+            stale_rec = record.model_copy(
+                update={
+                    "status": "stale",
+                    "application_status": "stale",
+                    "applied": False,
+                    "application_error": missing_reason,
+                }
+            )
+            _update_patch_record_in_store(project_dir, stale_rec)
+            _append_application_history(
+                project_dir,
+                PatchApplicationHistoryEntry(
+                    history_id=f"hist-{uuid.uuid4().hex[:12]}",
+                    patch_id=record.patch_id,
+                    project_id=project_id,
+                    finding_id=record.finding_id,
+                    file_path=norm_path,
+                    applied_at=now_iso,
+                    previous_file_sha256=base_sha,
+                    new_file_sha256=None,
+                    result="stale",
+                    error_message=missing_reason,
+                ),
+            )
+            raise PatchConflictError(f"Patch is stale: {missing_reason}")
+
+        try:
+            raw_before = target_file.read_bytes()
+        except OSError as exc:
+            raise PatchApplicationError(
+                "Target source file could not be read prior to patch application."
+            ) from exc
+
+        current_sha = hashlib.sha256(raw_before).hexdigest()
+        if current_sha != base_sha:
+            stale_msg = "Target source file has changed since patch generation."
+            stale_rec = record.model_copy(
+                update={
+                    "status": "stale",
+                    "application_status": "stale",
+                    "applied": False,
+                    "application_error": stale_msg,
+                }
+            )
+            _update_patch_record_in_store(project_dir, stale_rec)
+            _append_application_history(
+                project_dir,
+                PatchApplicationHistoryEntry(
+                    history_id=f"hist-{uuid.uuid4().hex[:12]}",
+                    patch_id=record.patch_id,
+                    project_id=project_id,
+                    finding_id=record.finding_id,
+                    file_path=norm_path,
+                    applied_at=now_iso,
+                    previous_file_sha256=current_sha,
+                    new_file_sha256=None,
+                    result="stale",
+                    error_message=stale_msg,
+                ),
+            )
+            raise PatchConflictError(f"Patch is stale: {stale_msg}")
+
+        # 3. Revalidate unified diff immediately before application.
+        try:
+            _validated, patched_text = apply_unified_diff_in_memory(
+                diff_text=record.unified_diff,
+                project_root=project_root,
+                expected_rel_path=norm_path,
+                settings=settings,
+            )
+        except PatchValidationError as exc:
+            failed_rec = record.model_copy(
+                update={
+                    "status": "application_failed",
+                    "application_status": "failed",
+                    "applied": False,
+                    "application_error": exc.message,
+                }
+            )
+            _update_patch_record_in_store(project_dir, failed_rec)
+            _append_application_history(
+                project_dir,
+                PatchApplicationHistoryEntry(
+                    history_id=f"hist-{uuid.uuid4().hex[:12]}",
+                    patch_id=record.patch_id,
+                    project_id=project_id,
+                    finding_id=record.finding_id,
+                    file_path=norm_path,
+                    applied_at=now_iso,
+                    previous_file_sha256=current_sha,
+                    new_file_sha256=None,
+                    result="failed",
+                    error_message=exc.message,
+                ),
+            )
+            raise
+
+        # 4. Preserve original content in isolated backup and atomically write patched file.
+        backup_file, rel_backup_path = _resolve_backup_path(
+            project_dir, record.patch_id, norm_path
+        )
+        try:
+            _atomic_write_bytes(backup_file, raw_before)
+            try:
+                os.chmod(backup_file, 0o444)
+            except OSError:
+                pass
+            _write_target_file_bytes(target_file, patched_text.encode("utf-8"))
+        except Exception as exc:
+            # Recover original file bytes only if target changed or disappeared.
+            try:
+                if not target_file.is_file() or (
+                    hashlib.sha256(target_file.read_bytes()).hexdigest() != current_sha
+                ):
+                    _atomic_write_bytes(target_file, raw_before)
+            except OSError:
+                pass
+
+            err_msg = "Failed to apply patch safely; original source file was preserved."
+            failed_rec = record.model_copy(
+                update={
+                    "status": "application_failed",
+                    "application_status": "failed",
+                    "applied": False,
+                    "backup_path": rel_backup_path if backup_file.is_file() else None,
+                    "application_error": err_msg,
+                }
+            )
+            _update_patch_record_in_store(project_dir, failed_rec)
+            _append_application_history(
+                project_dir,
+                PatchApplicationHistoryEntry(
+                    history_id=f"hist-{uuid.uuid4().hex[:12]}",
+                    patch_id=record.patch_id,
+                    project_id=project_id,
+                    finding_id=record.finding_id,
+                    file_path=norm_path,
+                    applied_at=now_iso,
+                    previous_file_sha256=current_sha,
+                    new_file_sha256=None,
+                    result="failed",
+                    backup_path=rel_backup_path if backup_file.is_file() else None,
+                    error_message=err_msg,
+                ),
+            )
+            raise PatchApplicationError(err_msg) from exc
+
+        new_sha = hashlib.sha256(target_file.read_bytes()).hexdigest()
+        applied_rec = record.model_copy(
+            update={
+                "status": "applied",
+                "application_status": "applied",
+                "applied": True,
+                "applied_at": now_iso,
+                "applied_file_sha256": new_sha,
+                "backup_path": rel_backup_path,
+                "application_error": None,
+            }
+        )
+        _update_patch_record_in_store(project_dir, applied_rec)
+
+        history_entry = PatchApplicationHistoryEntry(
+            history_id=f"hist-{uuid.uuid4().hex[:12]}",
+            patch_id=record.patch_id,
+            project_id=project_id,
+            finding_id=record.finding_id,
+            file_path=norm_path,
+            applied_at=now_iso,
+            previous_file_sha256=current_sha,
+            new_file_sha256=new_sha,
+            result="applied",
+            backup_path=rel_backup_path,
+            error_message=None,
+        )
+        _append_application_history(project_dir, history_entry)
+
+        return PatchApplyResponse(
+            message="Approved patch revalidated and applied safely.",
+            patch=applied_rec,
+            application_record=history_entry,
+        )
+
+
+def get_patch_application_history(
+    project_id: str, settings: Settings
+) -> PatchApplicationHistoryResponse:
+    """Return persisted patch application history for `project_id`."""
+    load_project(project_id, settings)
+    project_dir = _project_dir(project_id, settings)
+    entries = _load_application_history(project_dir / PATCH_HISTORY_NAME)
+    return PatchApplicationHistoryResponse(
+        project_id=project_id,
+        total_events=len(entries),
+        applied_count=sum(1 for e in entries if e.result == "applied"),
+        failed_count=sum(1 for e in entries if e.result == "failed"),
+        stale_count=sum(1 for e in entries if e.result == "stale"),
+        history=entries,
+    )

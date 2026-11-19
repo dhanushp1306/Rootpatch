@@ -158,13 +158,13 @@ def _build_change_snippets(
     return redact_sensitive_text(orig_slice), redact_sensitive_text(patched_slice)
 
 
-def validate_and_preview_unified_diff(
+def _validate_and_apply_in_memory(
     diff_text: str,
     project_root: Path,
     expected_rel_path: str,
     settings: Settings,
     llm_declared_target: Optional[str] = None,
-) -> ValidatedDiffResult:
+) -> Tuple[ValidatedDiffResult, str]:
     """Strictly validate a unified diff against an existing workspace file without modifying disk."""
     normalized_expected = normalize_expected_rel_path(expected_rel_path)
 
@@ -434,7 +434,7 @@ def validate_and_preview_unified_diff(
         "effective_non_noop_change",
     ]
 
-    return ValidatedDiffResult(
+    result = ValidatedDiffResult(
         canonical_diff=canonical_diff,
         target_rel_path=normalized_expected,
         hunks_count=len(hunks),
@@ -444,4 +444,47 @@ def validate_and_preview_unified_diff(
         original_snippet=original_snippet,
         proposed_snippet=proposed_snippet,
         checks_passed=checks_passed,
+    )
+
+    line_sep = "\r\n" if "\r\n" in original_source else "\n"
+    had_trailing_nl = original_source.endswith(("\n", "\r"))
+    if patched_lines:
+        patched_text = line_sep.join(patched_lines) + (line_sep if had_trailing_nl else "")
+    else:
+        patched_text = ""
+
+    return result, patched_text
+
+
+def validate_and_preview_unified_diff(
+    diff_text: str,
+    project_root: Path,
+    expected_rel_path: str,
+    settings: Settings,
+    llm_declared_target: Optional[str] = None,
+) -> ValidatedDiffResult:
+    """Strictly validate a unified diff against an existing workspace file without modifying disk."""
+    result, _patched_text = _validate_and_apply_in_memory(
+        diff_text=diff_text,
+        project_root=project_root,
+        expected_rel_path=expected_rel_path,
+        settings=settings,
+        llm_declared_target=llm_declared_target,
+    )
+    return result
+
+
+def apply_unified_diff_in_memory(
+    diff_text: str,
+    project_root: Path,
+    expected_rel_path: str,
+    settings: Settings,
+) -> Tuple[ValidatedDiffResult, str]:
+    """Revalidate `diff_text` against the current workspace file and return (result, patched_text)."""
+    return _validate_and_apply_in_memory(
+        diff_text=diff_text,
+        project_root=project_root,
+        expected_rel_path=expected_rel_path,
+        settings=settings,
+        llm_declared_target=expected_rel_path,
     )

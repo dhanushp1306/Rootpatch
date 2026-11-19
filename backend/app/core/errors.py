@@ -79,3 +79,19 @@ class PatchValidationError(PatchError):
         message: str = "Generated patch failed safety or unified diff validation.",
     ) -> None:
         super().__init__(message, 422)
+
+
+class PatchConflictError(PatchError):
+    def __init__(
+        self,
+        message: str = "Patch cannot transition from its current state.",
+    ) -> None:
+        super().__init__(message, 409)
+
+
+class PatchApplicationError(PatchError):
+    def __init__(
+        self,
+        message: str = "Failed to apply patch safely; original source file was preserved.",
+    ) -> None:
+        super().__init__(message, 500)
