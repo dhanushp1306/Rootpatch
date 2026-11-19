@@ -21,3 +21,12 @@ class ExtractionError(ProjectError):
 class ProjectNotFoundError(ProjectError):
     def __init__(self, message: str = "Project not found.") -> None:
         super().__init__(message, 404)
+
+
+class ScanError(ProjectError):
+    """Static analysis scan could not be completed or loaded."""
+
+
+class ScanNotFoundError(ProjectError):
+    def __init__(self, message: str = "No scan results found for this project.") -> None:
+        super().__init__(message, 404)

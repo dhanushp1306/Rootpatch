@@ -63,6 +63,18 @@ def _structure_limit() -> int:
     return _env_int("ROOTPATCH_MAX_STRUCTURE_NODES", 5000)
 
 
+def _scan_files_limit() -> int:
+    return _env_int("ROOTPATCH_MAX_SCAN_FILES", 1000)
+
+
+def _scan_file_bytes_limit() -> int:
+    return _env_int("ROOTPATCH_MAX_SCAN_FILE_BYTES", 2 * 1024 * 1024)
+
+
+def _scanner_timeout_limit() -> int:
+    return _env_int("ROOTPATCH_SCANNER_TIMEOUT_SECONDS", 30)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "RootPatch"
@@ -79,6 +91,11 @@ class Settings:
     max_extracted_total_bytes: int = field(default_factory=_total_limit)
     max_extracted_file_bytes: int = field(default_factory=_file_limit)
     max_structure_nodes: int = field(default_factory=_structure_limit)
+
+    # --- Step 3: static bug detection ---
+    max_scan_files: int = field(default_factory=_scan_files_limit)
+    max_scan_file_bytes: int = field(default_factory=_scan_file_bytes_limit)
+    scanner_timeout_seconds: int = field(default_factory=_scanner_timeout_limit)
 
 
 settings = Settings()

@@ -42,3 +42,19 @@ def format_bytes(num_bytes: int) -> str:
             return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
     return f"{num_bytes} B"
+
+
+_TEST_DIR_NAMES = frozenset({"tests", "test", "__tests__", "spec", "specs"})
+
+
+def is_python_test_path(rel_path: str) -> bool:
+    """True when `rel_path` refers to a Python test module or file inside a test directory."""
+    parts = [p.lower() for p in rel_path.replace("\\", "/").split("/") if p and p != "."]
+    if not parts:
+        return False
+    filename = parts[-1]
+    if not filename.endswith((".py", ".pyw")):
+        return False
+    if any(part in _TEST_DIR_NAMES for part in parts[:-1]):
+        return True
+    return filename.startswith("test_") or filename.endswith("_test.py") or filename == "conftest.py"

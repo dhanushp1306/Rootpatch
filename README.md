@@ -33,9 +33,11 @@ Tests use temporary directories only; they never touch `backend/workspace/`.
 | POST | `/api/projects/upload` | Upload a `.zip` (multipart field `file`); safely extracts and inspects it |
 | GET | `/api/projects/{project_id}` | Project metadata + inspection report |
 | GET | `/api/projects/{project_id}/structure` | Directory/file tree |
+| POST | `/api/projects/{project_id}/scan` | Run static bug detection (AST, Ruff, Bandit) on uploaded Python code |
+| GET | `/api/projects/{project_id}/scan` | Retrieve the latest saved scan report for a project |
 
 Error responses use `{"detail": "<message>"}`. Status codes: 201 created, 400 invalid/unsafe
-archive, 404 unknown project, 413 size/count limit exceeded, 415 unsupported file type,
+archive, 404 unknown project or scan, 413 size/count limit exceeded, 415 unsupported file type,
 422 missing form field.
 
 ## Upload workspace and limits
@@ -45,6 +47,7 @@ Each upload gets an isolated directory `backend/workspace/<project_id>/`:
 - `original/upload.zip` – read-only copy of the upload
 - `source/` – extracted working copy (uploaded code is never executed)
 - `metadata.json` – project metadata and inspection report
+- `scan_result.json` – latest Step 3 static bug detection report
 
 The workspace is git-ignored. Configure via environment variables (defaults in parentheses):
 
@@ -56,4 +59,7 @@ The workspace is git-ignored. Configure via environment variables (defaults in p
 | `ROOTPATCH_MAX_EXTRACTED_TOTAL_BYTES` | 209715200 (200 MB) |
 | `ROOTPATCH_MAX_EXTRACTED_FILE_BYTES` | 26214400 (25 MB) |
 | `ROOTPATCH_MAX_STRUCTURE_NODES` | 5000 |
+| `ROOTPATCH_MAX_SCAN_FILES` | 1000 |
+| `ROOTPATCH_MAX_SCAN_FILE_BYTES` | 2097152 (2 MB) |
+| `ROOTPATCH_SCANNER_TIMEOUT_SECONDS` | 30 |
 | `ROOTPATCH_CORS_ORIGINS` | local Vite / port 3000 origins |

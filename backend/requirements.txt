@@ -3,3 +3,6 @@ uvicorn
 pytest
 httpx
 python-multipart
+ruff
+bandit
+

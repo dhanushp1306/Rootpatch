@@ -9,6 +9,9 @@ venv/
 # Uploaded projects and extracted workspaces (never commit user uploads)
 backend/workspace/*
 !backend/workspace/.gitkeep
+workspace/*
+RootPatch_Step3_Static_Bug_Detection.zip
+RootPatch_Step3_Static_Bug_Detection_Fixed.zip
 
 # Secrets / local environment
 .env
