@@ -15,9 +15,15 @@ _DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:3000",
 )
 
-# backend/app/core/config.py -> parents[2] is the `backend/` directory.
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _BACKEND_DIR.parent
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(_BACKEND_DIR / ".env")
+except ImportError:
+    pass
 
 
 def _load_cors_origins() -> tuple[str, ...]:
@@ -112,15 +118,34 @@ def _env_optional_str(name: str) -> str | None:
 
 
 def _llm_provider() -> str:
-    return _env_str("ROOTPATCH_LLM_PROVIDER", "gemini").lower()
+    raw = _env_optional_str("ROOTPATCH_LLM_PROVIDER")
+    if raw:
+        return raw.lower()
+    base_url = _env_optional_str("ROOTPATCH_LLM_BASE_URL") or ""
+    if "groq.com" in base_url.lower():
+        return "openai-compatible"
+    groq_key = _env_optional_str("GROQ_API_KEY")
+    if groq_key:
+        return "openai-compatible"
+    explicit_key = _env_optional_str("ROOTPATCH_LLM_API_KEY")
+    if explicit_key and explicit_key.startswith("gsk_"):
+        return "openai-compatible"
+    if _env_optional_str("OPENAI_API_KEY"):
+        return "openai"
+    if _env_optional_str("XAI_API_KEY"):
+        return "xai"
+    return "gemini"
 
 
 def _llm_model() -> str:
     explicit = _env_optional_str("ROOTPATCH_LLM_MODEL")
     if explicit:
         return explicit
-    if _llm_provider() in ("xai", "grok"):
+    provider = _llm_provider()
+    if provider in ("xai", "grok"):
         return "grok-4.7"
+    if provider == "groq":
+        return "llama-3.3-70b-versatile"
     return "gemini-4-hydrogen"
 
 
@@ -133,13 +158,25 @@ def _llm_api_key() -> str | None:
         return _env_optional_str("GEMINI_API_KEY")
     if provider == "openai":
         return _env_optional_str("OPENAI_API_KEY")
+    if provider in ("openai-compatible", "groq"):
+        return _env_optional_str("GROQ_API_KEY") or _env_optional_str("OPENAI_API_KEY")
     if provider in ("xai", "grok"):
         return _env_optional_str("XAI_API_KEY")
-    return None
+    return (
+        _env_optional_str("GROQ_API_KEY")
+        or _env_optional_str("OPENAI_API_KEY")
+        or _env_optional_str("XAI_API_KEY")
+        or _env_optional_str("GEMINI_API_KEY")
+    )
 
 
 def _llm_base_url() -> str | None:
-    return _env_optional_str("ROOTPATCH_LLM_BASE_URL")
+    explicit = _env_optional_str("ROOTPATCH_LLM_BASE_URL")
+    if explicit:
+        return explicit
+    if _llm_provider() == "groq":
+        return "https://api.groq.com/openai/v1"
+    return None
 
 
 def _llm_timeout() -> int:

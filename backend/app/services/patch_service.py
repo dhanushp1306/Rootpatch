@@ -14,9 +14,10 @@ import re
 import tempfile
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -24,6 +25,7 @@ from app.core.config import Settings
 from app.core.errors import (
     AnalysisError,
     AnalysisNotFoundError,
+    FindingNotFoundError,
     LLMConfigurationError,
     LLMProviderError,
     PatchApplicationError,
@@ -81,6 +83,7 @@ _PATCH_ID_PATTERN = re.compile(r"^patch-[0-9a-f]{12}$")
 
 _LOCK_GUARD = threading.Lock()
 _PROJECT_LOCKS: Dict[str, threading.RLock] = {}
+_ACTIVE_GENERATIONS: Set[str] = set()
 
 _PATCH_SYSTEM_PROMPT = """You are a senior software security and reliability engineer for RootPatch.
 Your task is to generate minimal, focused, evidence-based unified diffs to fix diagnosed static bugs.
@@ -119,6 +122,22 @@ def _get_project_lock(project_id: str) -> threading.RLock:
             lock = threading.RLock()
             _PROJECT_LOCKS[project_id] = lock
         return lock
+
+
+@contextmanager
+def _guard_generation(project_id: str):
+    with _LOCK_GUARD:
+        if project_id in _ACTIVE_GENERATIONS:
+            raise PatchConflictError(
+                "Patch generation is already in progress for this project.",
+                code="generation_in_progress",
+            )
+        _ACTIVE_GENERATIONS.add(project_id)
+    try:
+        yield
+    finally:
+        with _LOCK_GUARD:
+            _ACTIVE_GENERATIONS.discard(project_id)
 
 
 def _is_valid_patch_id(patch_id: str) -> bool:
@@ -294,11 +313,12 @@ def _resolve_targets(
             raise PatchError(
                 "Specified finding_id does not match the specified analysis_id.",
                 400,
+                code="finding_mismatch",
             )
 
         finding = findings_by_id.get(analysis_item.finding_id)
         if finding is None:
-            raise PatchNotFoundError(
+            raise FindingNotFoundError(
                 f"Finding '{analysis_item.finding_id}' referenced by analysis '{req_analysis_id}' was not found in the latest scan."
             )
         return [(finding, analysis_item)], notes
@@ -306,17 +326,20 @@ def _resolve_targets(
     if req_finding_id is not None:
         finding = findings_by_id.get(req_finding_id)
         if finding is None:
-            raise PatchNotFoundError(
+            raise FindingNotFoundError(
                 f"Finding '{req_finding_id}' was not found in the latest scan."
             )
         if analysis_report.scan_id != scan.scan_id:
-            raise AnalysisNotFoundError(
-                "Latest root cause analysis belongs to a different scan; re-run analysis first."
+            raise PatchConflictError(
+                "Latest root cause analysis belongs to a different scan; re-run analysis first.",
+                code="analysis_outdated",
             )
         analysis_item = analyses_by_finding.get(finding.id)
         if analysis_item is None:
-            raise AnalysisNotFoundError(
-                f"No root cause analysis found for finding '{finding.id}'."
+            raise PatchError(
+                f"No root cause analysis found for finding '{finding.id}'. Run analysis before generating patch.",
+                status_code=400,
+                code="analysis_not_found",
             )
         return [(finding, analysis_item)], notes
 
@@ -324,9 +347,17 @@ def _resolve_targets(
     if not scan.findings:
         return [], notes
 
-    if analysis_report.scan_id != scan.scan_id or not analysis_report.analyses:
-        raise AnalysisNotFoundError(
-            "No root cause analysis results match the latest scan. Run analysis before generating patches."
+    if analysis_report.scan_id != scan.scan_id:
+        raise PatchConflictError(
+            "Latest root cause analysis belongs to a different scan; re-run analysis first.",
+            code="analysis_outdated",
+        )
+
+    if not analysis_report.analyses:
+        raise PatchError(
+            "No root cause analysis results match the latest scan. Run analysis before generating patches.",
+            status_code=400,
+            code="analysis_not_found",
         )
 
     targets: List[Tuple[FindingRecord, RootCauseAnalysisItem]] = []
@@ -344,8 +375,10 @@ def _resolve_targets(
         )
 
     if not targets:
-        raise AnalysisNotFoundError(
-            "No matching root cause analyses were found for the latest scan findings."
+        raise PatchError(
+            "No matching root cause analyses were found for the latest scan findings.",
+            status_code=400,
+            code="analysis_not_found",
         )
 
     return targets, notes
@@ -407,15 +440,48 @@ def generate_patches(
     provider: Optional[LLMProvider] = None,
 ) -> PatchBatchResponse:
     """Generate and validate unified-diff patches for diagnosed project findings."""
+    with _guard_generation(project_id):
+        return _generate_patches_impl(
+            project_id=project_id,
+            settings=settings,
+            request=request,
+            provider=provider,
+        )
+
+
+def _generate_patches_impl(
+    project_id: str,
+    settings: Settings,
+    request: Optional[PatchGenerateRequest] = None,
+    provider: Optional[LLMProvider] = None,
+) -> PatchBatchResponse:
     load_project(project_id, settings)
     project_dir = _project_dir(project_id, settings)
     source_dir = project_dir / SOURCE_DIR
     if not source_dir.is_dir():
-        raise ProjectNotFoundError()
+        raise PatchError(
+            "Project source workspace is missing or unreadable.",
+            status_code=500,
+            code="source_missing",
+        )
     project_root = find_project_root(source_dir)
+    try:
+        scan = get_latest_scan(project_id, settings)
+    except ScanNotFoundError:
+        raise PatchError(
+            "No static scan results found for this project. Run static scan before generating patches.",
+            status_code=400,
+            code="scan_not_found",
+        )
 
-    scan = get_latest_scan(project_id, settings)
-    analysis_report = get_latest_analysis(project_id, settings)
+    try:
+        analysis_report = get_latest_analysis(project_id, settings)
+    except AnalysisNotFoundError:
+        raise PatchError(
+            "No root cause analysis found for this project. Run analysis before generating patches.",
+            status_code=400,
+            code="analysis_not_found",
+        )
 
     targets, resolution_notes = _resolve_targets(
         project_id=project_id,
@@ -744,7 +810,11 @@ def get_patch_review(
     project_dir = _project_dir(project_id, settings)
     source_dir = project_dir / SOURCE_DIR
     if not source_dir.is_dir():
-        raise ProjectNotFoundError()
+        raise PatchError(
+            "Project source workspace is missing or unreadable.",
+            status_code=500,
+            code="source_missing",
+        )
     project_root = find_project_root(source_dir)
 
     record = _find_patch_record(project_dir, patch_id)
@@ -908,7 +978,11 @@ def approve_patch(
     project_dir = _project_dir(project_id, settings)
     source_dir = project_dir / SOURCE_DIR
     if not source_dir.is_dir():
-        raise ProjectNotFoundError()
+        raise PatchError(
+            "Project source workspace is missing or unreadable.",
+            status_code=500,
+            code="source_missing",
+        )
     project_root = find_project_root(source_dir)
 
     with _get_project_lock(project_id):
@@ -1017,7 +1091,11 @@ def apply_patch(
     project_dir = _project_dir(project_id, settings)
     source_dir = project_dir / SOURCE_DIR
     if not source_dir.is_dir():
-        raise ProjectNotFoundError()
+        raise PatchError(
+            "Project source workspace is missing or unreadable.",
+            status_code=500,
+            code="source_missing",
+        )
     project_root = find_project_root(source_dir)
 
     with _get_project_lock(project_id):

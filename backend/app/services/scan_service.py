@@ -112,7 +112,7 @@ def _collect_python_files(
             candidate_dir = current / d
             if candidate_dir.is_symlink():
                 continue
-            if d in IGNORED_DIRECTORIES:
+            if d in IGNORED_DIRECTORIES or d.lower() in IGNORED_DIRECTORIES:
                 continue
             if not is_within_directory(resolved_root, candidate_dir):
                 continue
@@ -217,7 +217,7 @@ def deduplicate_findings(findings: Sequence[FindingRecord]) -> List[FindingRecor
 
 def run_project_scan(project_id: str, settings: Settings) -> ScanResponse:
     """Run AST, Ruff, and Bandit static analysis on an uploaded project."""
-    load_project(project_id, settings)
+    metadata = load_project(project_id, settings)
     project_dir = _project_dir(project_id, settings)
     source_dir = project_dir / SOURCE_DIR
     if not source_dir.is_dir():
@@ -275,8 +275,37 @@ def run_project_scan(project_id: str, settings: Settings) -> ScanResponse:
         "Static analysis inspects code without executing uploaded files and cannot guarantee detection of all bugs.",
         "Security and quality findings should be reviewed by a developer in context before patching.",
     ]
+
+    non_python_languages = [
+        lang.name for lang in metadata.inspection.languages if lang.name != "Python"
+    ]
+    if non_python_languages:
+        limitations.append(
+            f"Non-Python language(s) detected: {', '.join(non_python_languages)}. "
+            "RootPatch static analysis currently inspects Python source files only; non-Python files were excluded from scanning."
+        )
+
     if not scannable_files:
-        limitations.append("No scannable Python source files were found in this project.")
+        if non_python_languages:
+            limitations.append(
+                f"No scannable Python source files were found in this project. "
+                f"Project contains {', '.join(non_python_languages)} which is not supported by the Python static analysis engine."
+            )
+        else:
+            limitations.append(
+                "No scannable Python source files were found in this project. The static analysis scanner did not execute."
+            )
+
+    for tool_name, tool_outcome in [
+        ("AST", ast_outcome.summary),
+        ("Ruff", ruff_outcome.summary),
+        ("Bandit", bandit_outcome.summary),
+    ]:
+        if tool_outcome.status in ("failed", "timed_out", "unavailable"):
+            limitations.append(
+                f"{tool_name} scanner {tool_outcome.status}: {tool_outcome.error or 'Execution could not complete.'} "
+                "Static findings from this tool may be missing."
+            )
 
     response = ScanResponse(
         project_id=project_id,

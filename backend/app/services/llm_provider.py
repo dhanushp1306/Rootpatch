@@ -6,6 +6,7 @@ placed in URL query parameters, or echoed in error responses.
 """
 
 import json
+import re
 from typing import Protocol
 
 import httpx
@@ -17,6 +18,58 @@ from app.core.errors import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
+
+_SECRET_PATTERNS = [
+    re.compile(r"gsk_[A-Za-z0-9_-]{8,}", re.IGNORECASE),
+    re.compile(r"sk-[A-Za-z0-9_-]{8,}", re.IGNORECASE),
+    re.compile(r"AIza[A-Za-z0-9_-]{8,}", re.IGNORECASE),
+    re.compile(r"xai-[A-Za-z0-9_-]{8,}", re.IGNORECASE),
+    re.compile(r"(?:bearer\s+|key=)[A-Za-z0-9_\-\.]{8,}", re.IGNORECASE),
+]
+
+
+def _sanitize_error_text(text: str, api_key: str | None = None) -> str:
+    cleaned = text
+    if api_key and len(api_key) > 5:
+        cleaned = cleaned.replace(api_key, "[REDACTED]")
+    for pat in _SECRET_PATTERNS:
+        cleaned = pat.sub("[REDACTED]", cleaned)
+    cleaned = re.sub(r"[?&]key=[^&\s]+", "?key=[REDACTED]", cleaned)
+    cleaned = " ".join(cleaned.split())
+    if len(cleaned) > 250:
+        cleaned = cleaned[:247] + "..."
+    return cleaned
+
+
+def _extract_sanitized_error_detail(
+    response: httpx.Response,
+    provider_name: str,
+    api_key: str | None = None,
+) -> str:
+    """Extract and redact human-readable upstream error explanation from response."""
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            err_obj = data.get("error")
+            if isinstance(err_obj, dict):
+                msg = str(err_obj.get("message") or "").strip()
+                status = str(err_obj.get("status") or "").strip()
+                if msg:
+                    prefix = f"[{status}] " if status and status not in msg else ""
+                    return _sanitize_error_text(f"{prefix}{msg}", api_key)
+            elif isinstance(err_obj, str) and err_obj.strip():
+                return _sanitize_error_text(err_obj, api_key)
+
+            generic_msg = str(data.get("message") or data.get("detail") or "").strip()
+            if generic_msg:
+                return _sanitize_error_text(generic_msg, api_key)
+    except Exception:
+        pass
+
+    raw_text = (response.text or "").strip()
+    if raw_text:
+        return _sanitize_error_text(raw_text, api_key)
+    return ""
 
 
 class LLMProvider(Protocol):
@@ -70,12 +123,13 @@ class GeminiLLMProvider:
             raise LLMProviderError(
                 "Gemini API authentication failed; verify the configured API key.",
                 status_code=502,
+                code="llm_auth_failed",
             )
         if response.status_code >= 400:
-            raise LLMProviderError(
-                f"Gemini API returned HTTP {response.status_code}.",
-                status_code=502,
-            )
+            detail = _extract_sanitized_error_detail(response, "gemini", api_key)
+            msg = f"Gemini API returned HTTP {response.status_code}: {detail}" if detail else f"Gemini API returned HTTP {response.status_code}."
+            code = "llm_bad_request" if response.status_code == 400 else "llm_provider_error"
+            raise LLMProviderError(msg, status_code=502, code=code)
 
         try:
             data = response.json()
@@ -145,18 +199,30 @@ class OpenAICompatibleLLMProvider:
                 f"Network error contacting LLM provider: {type(exc).__name__}."
             ) from exc
 
+        is_groq = (
+            "groq" in provider_name
+            or (settings.llm_base_url is not None and "groq.com" in settings.llm_base_url.lower())
+            or (api_key is not None and api_key.startswith("gsk_"))
+        )
+        provider_label = (
+            "Groq"
+            if is_groq
+            else ("Grok" if is_xai else ("OpenAI" if provider_name == "openai" else "LLM provider"))
+        )
+
         if response.status_code == 429:
             raise LLMRateLimitError("LLM provider rate limit exceeded. Please retry later.")
         if response.status_code in (401, 403):
             raise LLMProviderError(
                 "LLM provider authentication failed; verify the configured API key.",
                 status_code=502,
+                code="llm_auth_failed",
             )
         if response.status_code >= 400:
-            raise LLMProviderError(
-                f"LLM provider returned HTTP {response.status_code}.",
-                status_code=502,
-            )
+            detail = _extract_sanitized_error_detail(response, provider_name, api_key)
+            msg = f"{provider_label} returned HTTP {response.status_code}: {detail}" if detail else f"{provider_label} returned HTTP {response.status_code}."
+            code = "llm_bad_request" if response.status_code == 400 else "llm_provider_error"
+            raise LLMProviderError(msg, status_code=502, code=code)
 
         try:
             data = response.json()
@@ -177,10 +243,21 @@ def build_llm_provider(settings: Settings) -> LLMProvider:
     provider_name = (settings.llm_provider or "gemini").strip().lower()
     if provider_name == "gemini":
         return GeminiLLMProvider()
-    if provider_name in ("openai", "openai-compatible"):
+    if provider_name in ("openai", "openai-compatible", "groq"):
+        is_groq = (
+            provider_name == "groq"
+            or (settings.llm_base_url is not None and "groq.com" in settings.llm_base_url.lower())
+            or (settings.llm_api_key is not None and settings.llm_api_key.startswith("gsk_"))
+        )
+        default_base = (
+            "https://api.groq.com/openai/v1"
+            if is_groq
+            else "https://api.openai.com/v1"
+        )
+        api_hint = "GROQ_API_KEY" if is_groq else "OPENAI_API_KEY"
         return OpenAICompatibleLLMProvider(
-            default_base_url="https://api.openai.com/v1",
-            api_key_env_hint="OPENAI_API_KEY",
+            default_base_url=default_base,
+            api_key_env_hint=api_hint,
         )
     if provider_name in ("xai", "grok"):
         return OpenAICompatibleLLMProvider(
@@ -188,7 +265,7 @@ def build_llm_provider(settings: Settings) -> LLMProvider:
             api_key_env_hint="XAI_API_KEY",
         )
     raise LLMConfigurationError(
-        f"Unsupported LLM provider '{settings.llm_provider}'. Supported providers: gemini, openai, xai, grok."
+        f"Unsupported LLM provider '{settings.llm_provider}'. Supported providers: gemini, openai, openai-compatible, groq, xai, grok."
     )
 
 

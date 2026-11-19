@@ -1,0 +1,54 @@
+# RootPatch Production Python Validation Image
+# Target tag: rootpatch-python-validate:latest
+#
+# Build command:
+#   docker build -t rootpatch-python-validate:latest -f docker/Dockerfile.python-validate .
+#
+# ==============================================================================
+# SECURITY INVARIANTS:
+# 1. Network: Containers run with `--network none`. Inbound and outbound network
+#    access is completely blocked at the container runtime level.
+# 2. Filesystem: Root filesystem is mounted `--read-only`. Only `/workspace` (the
+#    ephemeral project copy) and a memory-backed `/tmp` tmpfs are writable.
+# 3. Privileges: Container runs as unprivileged `nobody:nogroup` (UID/GID 65534).
+#    All Linux capabilities are dropped (`--cap-drop ALL`), and privilege escalation
+#    is prohibited (`--security-opt no-new-privileges:true`).
+# 4. Workspace Confinement: The container ONLY mounts a temporary snapshot directory
+#    created via `tempfile.mkdtemp()`. The primary workspace is never mounted.
+#
+# ==============================================================================
+# DEPENDENCY & TESTING SCOPE LIMITATIONS:
+# Because `--network none` prohibits internet connectivity, uploaded projects
+# CANNOT execute `pip install` during patch validation.
+#
+# Supported test environments in this image:
+# - Python 3.11 standard library and unittest module
+# - pytest test suites relying on pytest and standard test plugins
+#
+# Projects that require third-party libraries (e.g. Django, Flask, FastAPI, numpy,
+# requests) must either have those dependencies vendored, rely on mocking, or have
+# an extended validation image built with those dependencies pre-installed.
+# ==============================================================================
+
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install standard Python test runners and mocking tools
+RUN pip install --no-cache-dir \
+    pytest==8.3.4 \
+    pytest-timeout==2.3.1 \
+    pytest-mock==3.14.0
+
+# Ensure /tmp and /workspace have sticky permissions allowing nobody:nogroup (UID 65534)
+# to write execution caches (.pytest_cache, temp files)
+RUN mkdir -p /workspace /tmp && \
+    chmod 1777 /tmp /workspace
+
+WORKDIR /workspace
+
+# Default fallback command (RootPatch overrides argv on container launch)
+CMD ["python", "-m", "pytest"]

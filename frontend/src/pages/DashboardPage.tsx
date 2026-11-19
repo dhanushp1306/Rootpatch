@@ -149,6 +149,18 @@ export function DashboardPage({
         <StateBanner variant="warning" title="Backend Health Unavailable" message={healthError} />
       ) : null}
 
+      {scan && scan.files_scanned === 0 ? (
+        <StateBanner
+          variant="warning"
+          title="Static Scanner Limitation"
+          message={
+            scan.limitations.length > 0
+              ? scan.limitations.map((l) => sanitizeSingleLine(l)).join(" · ")
+              : "No scannable Python source files found. RootPatch static scanners currently analyze Python (.py) files only."
+          }
+        />
+      ) : null}
+
       {/* Top metric cards */}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="rounded-lg border border-slate-200 bg-white p-5">
@@ -174,7 +186,11 @@ export function DashboardPage({
           </p>
           <p className="mt-1 text-xs text-slate-500 tabular-nums">
             {scan
-              ? `${scan.severity_summary.CRITICAL ?? 0} critical · ${scan.severity_summary.HIGH ?? 0} high · ${scan.severity_summary.MEDIUM ?? 0} medium`
+              ? scan.files_scanned === 0
+                ? "0 files scanned (No Python files)"
+                : scan.total_findings === 0
+                ? `Clean (${scan.files_scanned} files scanned)`
+                : `${scan.severity_summary.CRITICAL ?? 0} critical · ${scan.severity_summary.HIGH ?? 0} high · ${scan.severity_summary.MEDIUM ?? 0} medium`
               : "Scan not yet run"}
           </p>
         </div>

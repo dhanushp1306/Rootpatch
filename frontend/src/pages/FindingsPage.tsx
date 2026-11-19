@@ -56,6 +56,9 @@ export function FindingsPage({
     setActionError(null);
     setActionSuccess(null);
     setSelectedFindingId(null);
+    setSearchQuery("");
+    setSeverityFilter("ALL");
+    setToolFilter("ALL");
   }, [projectKey]);
 
   const analysisByFindingId = useMemo(() => {
@@ -219,7 +222,20 @@ export function FindingsPage({
           <button
             type="button"
             onClick={() => handleGeneratePatches()}
-            disabled={!scan || !analysis || generatingBatch}
+            disabled={
+              !scan ||
+              !analysis ||
+              generatingBatch ||
+              scan.total_findings === 0 ||
+              analysis.analyses.length === 0
+            }
+            title={
+              scan && scan.total_findings === 0
+                ? "No static findings to generate patches for"
+                : analysis && analysis.analyses.length === 0
+                ? "Root-cause analysis has zero findings"
+                : undefined
+            }
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap shrink-0"
           >
             {generatingBatch ? (
@@ -272,6 +288,34 @@ export function FindingsPage({
         />
       ) : (
         <>
+          {scan.files_scanned === 0 ? (
+            <StateBanner
+              variant="warning"
+              title="No Python Source Files Scanned"
+              message={
+                scan.limitations.length > 0
+                  ? scan.limitations.map((l) => sanitizeSingleLine(l)).join(" · ")
+                  : "No scannable Python (.py, .pyw) source files were discovered in this project. Non-Python repositories are currently not supported by static scanners."
+              }
+            />
+          ) : scan.total_findings === 0 ? (
+            <StateBanner
+              variant="success"
+              title="Clean Scan - Zero Findings"
+              message={`AST, Ruff, and Bandit scanners inspected ${scan.files_scanned} Python source files and detected zero static bug or security findings.`}
+            />
+          ) : null}
+
+          {Object.values(scan.scanner_details).some(
+            (d) => d.status === "failed" || d.status === "timed_out"
+          ) ? (
+            <StateBanner
+              variant="error"
+              title="Scanner Execution Failure"
+              message="One or more static scanners encountered errors or timed out during execution. Review scanner breakdown below."
+            />
+          ) : null}
+
           {!analysis ? (
             <StateBanner
               variant="info"
@@ -290,6 +334,12 @@ export function FindingsPage({
                   <span>{runningAnalysis ? "Analyzing..." : "Analyze Now"}</span>
                 </button>
               }
+            />
+          ) : analysis.analyses.length === 0 || scan.total_findings === 0 ? (
+            <StateBanner
+              variant="info"
+              title="No Patches Can Be Generated"
+              message="Zero findings are available for patch generation. Static scanning and root-cause analysis found no issues requiring code modifications."
             />
           ) : !patches || patches.patches.length === 0 ? (
             <StateBanner
@@ -411,8 +461,18 @@ export function FindingsPage({
           {/* Master-detail findings + root cause inspector */}
           {filteredFindings.length === 0 ? (
             <EmptyState
-              title="No Findings Match Filter"
-              description="Adjust your severity, tool, or search filter, or celebrate if total findings is zero."
+              title={
+                scan.total_findings === 0
+                  ? "Clean Project – No Findings Detected"
+                  : "No Findings Match Filter"
+              }
+              description={
+                scan.total_findings === 0
+                  ? scan.files_scanned === 0
+                    ? "No scannable Python source files were found in this repository. Add Python files to run static inspection."
+                    : `Static inspection finished across ${scan.files_scanned} files with zero bug or security warnings.`
+                  : "Adjust your severity, tool, or search filter to view findings."
+              }
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -479,7 +539,12 @@ export function FindingsPage({
                         <button
                           type="button"
                           onClick={() => handleGeneratePatches(activeFinding.id)}
-                          disabled={!analysis || generatingForFindingId === activeFinding.id}
+                          disabled={!activeAnalysis || generatingForFindingId === activeFinding.id}
+                          title={
+                            !activeAnalysis
+                              ? "Run root-cause analysis before generating a patch for this finding"
+                              : "Generate a targeted unified diff patch"
+                          }
                           className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap shrink-0"
                         >
                           {generatingForFindingId === activeFinding.id ? (

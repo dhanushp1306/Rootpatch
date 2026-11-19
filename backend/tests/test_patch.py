@@ -294,14 +294,14 @@ def test_missing_prerequisites_and_not_found_errors(make_patch_client, make_zip,
     pid = up.json()["project_id"]
 
     no_scan = client.post(f"/api/projects/{pid}/patches/generate")
-    assert no_scan.status_code == 404
+    assert no_scan.status_code == 400
     assert "scan" in no_scan.json()["detail"].lower()
 
-    # Scanned without Step 4 analysis -> 404
+    # Scanned without Step 4 analysis -> 400
     scan_resp = client.post(f"/api/projects/{pid}/scan")
     assert scan_resp.status_code == 200
     no_analysis = client.post(f"/api/projects/{pid}/patches/generate")
-    assert no_analysis.status_code == 404
+    assert no_analysis.status_code == 400
     assert "analysis" in no_analysis.json()["detail"].lower()
 
     # No patches generated yet -> 404 on GET

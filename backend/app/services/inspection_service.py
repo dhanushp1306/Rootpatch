@@ -86,11 +86,12 @@ _JAVA_TEST_PATTERN = re.compile(r"(Test|Tests|IT)\.java$")
 def find_project_root(source_dir: Path) -> Path:
     """If the archive has a single top-level directory, that is the project root."""
     try:
-        entries = list(source_dir.iterdir())
+        entries = [e for e in source_dir.iterdir() if not e.is_symlink()]
     except OSError:
         return source_dir
-    if len(entries) == 1 and entries[0].is_dir() and not entries[0].is_symlink():
-        return entries[0]
+    clean_entries = [e for e in entries if e.name.lower() not in {"__macosx", ".ds_store"}]
+    if len(clean_entries) == 1 and clean_entries[0].is_dir():
+        return clean_entries[0]
     return source_dir
 
 

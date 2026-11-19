@@ -1,0 +1,21 @@
+# RootPatch Production Backend Dependencies
+# Pinned for reproducible deployment on Ubuntu 24.04 LTS / Debian 12
+# Install with: pip install --no-cache-dir -r requirements-prod.txt
+
+# ASGI Web Framework & Server
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+pydantic==2.10.6
+
+# HTTP Client for LLM Provider Transport (Groq, Gemini, OpenAI, xAI)
+httpx==0.28.1
+
+# Multipart Form Data Parsing (ZIP Project Uploads)
+python-multipart==0.0.20
+
+# Environment Variable Management
+python-dotenv==1.0.1
+
+# Static Bug Scanners (Executed safely without running user code)
+ruff==0.9.6
+bandit==1.8.2

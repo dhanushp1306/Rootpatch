@@ -39,6 +39,12 @@ export function getApiBaseUrl(): string {
   if (configured && configured.trim()) {
     return configured.trim().replace(/\/+$/, "");
   }
+  // In production deployments where no explicit base URL is configured,
+  // return an empty string to allow same-origin relative requests (e.g. /api/...).
+  if (import.meta.env.PROD) {
+    return "";
+  }
+  // During local development, fallback to the standard localhost backend server.
   return "http://localhost:8000";
 }
 

@@ -37,6 +37,7 @@ def _clear_llm_env(monkeypatch):
         "GEMINI_API_KEY",
         "OPENAI_API_KEY",
         "XAI_API_KEY",
+        "GROQ_API_KEY",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -434,5 +435,256 @@ def test_xai_provider_end_to_end_analysis_and_patch_workflows(workspace, make_zi
             assert patch_body["provider"] == "xai"
             assert patch_body["model"] == "grok-4.7"
             assert patch_body["generated_count"] == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+# --- Regression tests: Groq, OpenAI-compatible, fallback resolution & HTTP 400 ---
+
+
+def test_groq_and_openai_compatible_provider_selection_and_key_resolution(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("ROOTPATCH_LLM_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("ROOTPATCH_LLM_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setenv("ROOTPATCH_LLM_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_fallback_groq_key")
+
+    cfg = Settings()
+    assert cfg.llm_provider == "openai-compatible"
+    assert cfg.llm_model == "openai/gpt-oss-120b"
+    assert cfg.llm_api_key == "gsk_fallback_groq_key"
+    assert cfg.llm_base_url == "https://api.groq.com/openai/v1"
+
+    provider = build_llm_provider(cfg)
+    assert isinstance(provider, OpenAICompatibleLLMProvider)
+    assert provider.default_base_url == "https://api.groq.com/openai/v1"
+    assert provider.api_key_env_hint == "GROQ_API_KEY"
+
+    # Test "groq" alias and default model
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("ROOTPATCH_LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_groq_alias_key")
+
+    cfg_groq = Settings()
+    assert cfg_groq.llm_provider == "groq"
+    assert cfg_groq.llm_model == "llama-3.3-70b-versatile"
+    assert cfg_groq.llm_api_key == "gsk_groq_alias_key"
+    assert cfg_groq.llm_base_url == "https://api.groq.com/openai/v1"
+
+    provider_groq = build_llm_provider(cfg_groq)
+    assert isinstance(provider_groq, OpenAICompatibleLLMProvider)
+    assert provider_groq.default_base_url == "https://api.groq.com/openai/v1"
+
+
+def test_auto_detect_openai_compatible_from_groq_env(monkeypatch):
+    # Auto-detect from ROOTPATCH_LLM_BASE_URL containing groq.com
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("ROOTPATCH_LLM_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "fallback-key")
+    cfg1 = Settings()
+    assert cfg1.llm_provider == "openai-compatible"
+
+    # Auto-detect from GROQ_API_KEY
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test123")
+    cfg2 = Settings()
+    assert cfg2.llm_provider == "openai-compatible"
+    assert cfg2.llm_api_key == "gsk_test123"
+
+    # Auto-detect from ROOTPATCH_LLM_API_KEY starting with gsk_
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("ROOTPATCH_LLM_API_KEY", "gsk_test456")
+    cfg3 = Settings()
+    assert cfg3.llm_provider == "openai-compatible"
+    assert cfg3.llm_api_key == "gsk_test456"
+
+
+def test_gemini_http_400_invalid_key_error_sanitization():
+    secret_key = "AIzaSySecretGeminiKey12345"
+    http_client = _DummyHttpClient(
+        lambda _url, **_kw: httpx.Response(
+            status_code=400,
+            json={
+                "error": {
+                    "code": 400,
+                    "message": f"API key not valid for {secret_key}. Please pass a valid API key.",
+                    "status": "INVALID_ARGUMENT",
+                }
+            },
+        )
+    )
+    cfg = replace(
+        default_settings,
+        llm_provider="gemini",
+        llm_model="gemini-4-hydrogen",
+        llm_api_key=secret_key,
+    )
+
+    with patch("app.services.llm_provider.httpx.Client", return_value=http_client):
+        with pytest.raises(LLMProviderError) as exc_info:
+            build_llm_provider(cfg).analyze("sys", "usr", cfg)
+
+    err = exc_info.value
+    assert err.status_code == 502
+    assert err.code == "llm_bad_request"
+    assert "API key not valid" in err.message
+    assert secret_key not in err.message
+
+
+def test_gemini_http_400_invalid_model_error_sanitization():
+    http_client = _DummyHttpClient(
+        lambda _url, **_kw: httpx.Response(
+            status_code=400,
+            json={
+                "error": {
+                    "code": 400,
+                    "message": "models/gemini-4-hydrogen is not found for API version v1beta, or is not supported for generateContent.",
+                    "status": "INVALID_ARGUMENT",
+                }
+            },
+        )
+    )
+    cfg = replace(
+        default_settings,
+        llm_provider="gemini",
+        llm_model="gemini-4-hydrogen",
+        llm_api_key="placeholder-key",
+    )
+
+    with patch("app.services.llm_provider.httpx.Client", return_value=http_client):
+        with pytest.raises(LLMProviderError) as exc_info:
+            build_llm_provider(cfg).analyze("sys", "usr", cfg)
+
+    err = exc_info.value
+    assert err.status_code == 502
+    assert err.code == "llm_bad_request"
+    assert "models/gemini-4-hydrogen is not found" in err.message
+
+
+def test_groq_http_400_model_not_found_error_sanitization():
+    http_client = _DummyHttpClient(
+        lambda _url, **_kw: httpx.Response(
+            status_code=400,
+            json={
+                "error": {
+                    "message": "The model 'openai/gpt-oss-120b' does not exist or you do not have access to it.",
+                    "type": "invalid_request_error",
+                    "code": "model_not_found",
+                }
+            },
+        )
+    )
+    cfg = replace(
+        default_settings,
+        llm_provider="openai-compatible",
+        llm_model="openai/gpt-oss-120b",
+        llm_base_url="https://api.groq.com/openai/v1",
+        llm_api_key="gsk_placeholder_test",
+    )
+
+    with patch("app.services.llm_provider.httpx.Client", return_value=http_client):
+        with pytest.raises(LLMProviderError) as exc_info:
+            build_llm_provider(cfg).analyze("sys", "usr", cfg)
+
+    err = exc_info.value
+    assert err.status_code == 502
+    assert err.code == "llm_bad_request"
+    assert "Groq returned HTTP 400" in err.message
+    assert "The model 'openai/gpt-oss-120b' does not exist" in err.message
+    assert "gsk_placeholder_test" not in err.message
+
+
+def test_groq_openai_compatible_end_to_end_analysis_and_patch(workspace, make_zip):
+    old_code = "def calc():\n    return undefined_var\n"
+    new_code = "def calc():\n    return 42\n"
+    diff_text = "\n".join(
+        difflib.unified_diff(
+            old_code.splitlines(),
+            new_code.splitlines(),
+            fromfile="a/calc.py",
+            tofile="b/calc.py",
+            n=3,
+            lineterm="",
+        )
+    ) + "\n"
+
+    test_settings = replace(
+        default_settings,
+        workspace_dir=workspace,
+        llm_provider="openai-compatible",
+        llm_model="openai/gpt-oss-120b",
+        llm_base_url="https://api.groq.com/openai/v1",
+        llm_api_key="gsk_test_api_key",
+    )
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    app.dependency_overrides.pop(get_llm_provider, None)
+
+    try:
+        client = TestClient(app)
+        up = upload(client, make_zip({"proj/calc.py": old_code}))
+        assert up.status_code == 201
+        pid = up.json()["project_id"]
+
+        scan_resp = client.post(f"/api/projects/{pid}/scan")
+        assert scan_resp.status_code == 200
+        finding = scan_resp.json()["findings"][0]
+
+        def _mock_post(url, **kwargs):
+            assert url == "https://api.groq.com/openai/v1/chat/completions"
+            assert kwargs["headers"]["Authorization"] == "Bearer gsk_test_api_key"
+            assert kwargs["json"]["model"] == "openai/gpt-oss-120b"
+            if "unified_diff" in kwargs["json"]["messages"][0]["content"]:
+                payload = {
+                    "patches": [
+                        {
+                            "finding_id": finding["id"],
+                            "target_file": "calc.py",
+                            "unified_diff": diff_text,
+                            "summary": "Fix undefined_var.",
+                            "explanation": "Return constant 42.",
+                            "confidence": "HIGH",
+                        }
+                    ],
+                    "limitations": [],
+                }
+            else:
+                payload = {
+                    "analyses": [
+                        {
+                            "finding_id": finding["id"],
+                            "root_cause": "undefined_var is not defined.",
+                            "technical_explanation": "calc.py references undefined_var.",
+                            "affected_component": "calc.py:L2",
+                            "impact": "Raises NameError.",
+                            "recommended_fix": "Return integer 42.",
+                            "evidence": ["return undefined_var"],
+                            "assumptions_or_uncertainties": [],
+                            "related_finding_ids": [],
+                            "confidence": "HIGH",
+                            "confidence_reason": "Direct code evidence.",
+                            "analysis_status": "completed",
+                        }
+                    ],
+                    "shared_root_cause_groups": [],
+                    "limitations": [],
+                }
+            return SimpleNamespace(
+                status_code=200,
+                json=lambda p=payload: {"choices": [{"message": {"content": json.dumps(p)}}]},
+            )
+
+        with patch("app.services.llm_provider.httpx.Client", return_value=_DummyHttpClient(_mock_post)):
+            analyze_resp = client.post(f"/api/projects/{pid}/analyze")
+            assert analyze_resp.status_code == 200
+            analyze_data = analyze_resp.json()
+            assert analyze_data["provider"] == "openai-compatible"
+            assert analyze_data["model"] == "openai/gpt-oss-120b"
+
+            patch_resp = client.post(f"/api/projects/{pid}/patches/generate")
+            assert patch_resp.status_code == 200
+            patch_data = patch_resp.json()
+            assert patch_data["provider"] == "openai-compatible"
+            assert patch_data["model"] == "openai/gpt-oss-120b"
+            assert patch_data["generated_count"] == 1
     finally:
         app.dependency_overrides.clear()

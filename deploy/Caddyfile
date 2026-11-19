@@ -1,0 +1,70 @@
+# RootPatch Production Caddy Configuration
+# Reverse Proxy with Automatic HTTPS, Static SPA Hosting, and API Routing
+#
+# Replace 'rootpatch.yourdomain.com' with your actual public domain name.
+# Credentials for Basic Authentication are supplied through environment variables
+# (see DEPLOYMENT.md). Never hardcode passwords or password hashes here.
+
+rootpatch.yourdomain.com {
+	# Automatic HTTPS is enabled by default for valid public domain names.
+	# To test locally or with a raw IP, replace the domain above with ':80' or ':443'.
+
+	# Set maximum request body size to 60 MB to support the 50 MB project ZIP
+	# upload limit with reasonable overhead for multipart encoding.
+	request_body {
+		max_size 60MB
+	}
+
+	# Enable modern HTTP compression
+	encode zstd gzip
+
+	# Production HTTP Security Headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Protect the entire site (frontend and API) with HTTP Basic Authentication.
+	# Credentials are provided by the ROOTPATCH_BASIC_AUTH_USER and
+	# ROOTPATCH_BASIC_AUTH_HASH environment variables (bcrypt hash).
+	basic_auth {
+		{$ROOTPATCH_BASIC_AUTH_USER} {$ROOTPATCH_BASIC_AUTH_HASH}
+	}
+
+	# Route all API traffic to the Uvicorn FastAPI backend listening on localhost.
+	# This handle is evaluated only after Basic Authentication succeeds.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000 {
+			# Standard proxy headers
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+
+			# Extended response timeout for LLM analysis and patch generation workflows
+			transport http {
+				response_header_timeout 90s
+			}
+		}
+	}
+
+	# Serve the built React/Vite Single Page Application
+	handle {
+		root * /var/www/rootpatch/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Structured JSON access logging
+	log {
+		output file /var/log/caddy/rootpatch.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+		format json
+	}
+}

@@ -123,5 +123,5 @@ def build_project_status(project_id: str, settings: Settings) -> ProjectStatusRe
         validations=validations_status,
         patch_counts=counts,
         can_analyze=structure.available,
-        can_generate_patches=analysis_status.available,
+        can_generate_patches=analysis_status.available and (analysis_status.count or 0) > 0,
     )

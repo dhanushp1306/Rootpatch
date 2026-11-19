@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, RootPatchApiClient } from "../services/apiClient";
+import { ApiError, RootPatchApiClient, getApiBaseUrl } from "../services/apiClient";
 
 describe("RootPatchApiClient", () => {
   afterEach(() => {
@@ -168,5 +168,33 @@ describe("RootPatchApiClient status + error codes", () => {
     await expect(
       new RootPatchApiClient("http://localhost:8000").getProjectStatus("p1")
     ).rejects.toMatchObject({ status: 404, code: null });
+  });
+});
+
+describe("getApiBaseUrl", () => {
+  const originalEnv = { ...import.meta.env };
+
+  afterEach(() => {
+    // Restore import.meta.env after each test
+    Object.assign(import.meta.env, originalEnv);
+  });
+
+  it("returns explicit VITE_API_BASE_URL without trailing slashes", () => {
+    import.meta.env.VITE_API_BASE_URL = "https://api.rootpatch.example.com///";
+    expect(getApiBaseUrl()).toBe("https://api.rootpatch.example.com");
+  });
+
+  it("returns empty string in production when VITE_API_BASE_URL is unset", () => {
+    delete import.meta.env.VITE_API_BASE_URL;
+    (import.meta.env as unknown as { PROD: boolean }).PROD = true;
+    (import.meta.env as unknown as { DEV: boolean }).DEV = false;
+    expect(getApiBaseUrl()).toBe("");
+  });
+
+  it("returns localhost fallback in development when VITE_API_BASE_URL is unset", () => {
+    delete import.meta.env.VITE_API_BASE_URL;
+    (import.meta.env as unknown as { PROD: boolean }).PROD = false;
+    (import.meta.env as unknown as { DEV: boolean }).DEV = true;
+    expect(getApiBaseUrl()).toBe("http://localhost:8000");
   });
 });

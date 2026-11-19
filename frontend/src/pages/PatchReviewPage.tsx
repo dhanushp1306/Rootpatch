@@ -60,6 +60,13 @@ export function PatchReviewPage({
   const projectKey = project?.project_id ?? null;
 
   useEffect(() => {
+    setActionBanner(null);
+    setGenerateError(null);
+    setReviewNote("");
+    setSelectedPatchId(null);
+  }, [projectKey]);
+
+  useEffect(() => {
     if (!projectKey || !effectivePatchId) {
       setReview(null);
       return;
@@ -135,26 +142,11 @@ export function PatchReviewPage({
           <StateBanner variant="error" title="Patch Generation Failed" message={generateError} />
         ) : null}
         {generating ? <LoadingState label="Generating validated patches..." /> : null}
-        <EmptyState
-          title="No Patches Generated Yet"
-          description={
-            analysis
-              ? "Root-cause analysis is available for this project. Generate patches to review them here."
-              : "Run static bug detection, generate AI root-cause analyses, and generate patches before reviewing changes here."
-          }
-          action={
-            analysis ? (
-              <button
-                type="button"
-                onClick={() => {
-                  void handleGenerate();
-                }}
-                disabled={generating}
-                className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
-              >
-                {generating ? "Generating..." : "Generate Patches"}
-              </button>
-            ) : (
+        {analysis && analysis.analyses.length === 0 ? (
+          <EmptyState
+            title="No Findings to Patch"
+            description="Static scanning and root-cause analysis found zero issues in this project. Patches cannot be generated because there are no diagnosed findings to fix."
+            action={
               <button
                 type="button"
                 onClick={onGoToFindings}
@@ -162,9 +154,40 @@ export function PatchReviewPage({
               >
                 Open Bugs & Root Cause
               </button>
-            )
-          }
-        />
+            }
+          />
+        ) : (
+          <EmptyState
+            title="No Patches Generated Yet"
+            description={
+              analysis && analysis.analyses.length > 0
+                ? "Root-cause analysis is available for this project. Generate patches to review them here."
+                : "Run static bug detection, generate AI root-cause analyses, and generate patches before reviewing changes here."
+            }
+            action={
+              analysis && analysis.analyses.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleGenerate();
+                  }}
+                  disabled={generating}
+                  className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {generating ? "Generating..." : "Generate Patches"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onGoToFindings}
+                  className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+                >
+                  Open Bugs & Root Cause
+                </button>
+              )
+            }
+          />
+        )}
       </div>
     );
   }

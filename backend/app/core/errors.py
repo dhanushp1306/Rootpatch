@@ -42,6 +42,12 @@ class ScanNotFoundError(ProjectError):
         super().__init__(message, 404)
 
 
+class FindingNotFoundError(ProjectError):
+    default_code = "finding_not_found"
+    def __init__(self, message: str = "Finding not found in project scan.") -> None:
+        super().__init__(message, 404, code="finding_not_found")
+
+
 class AnalysisError(ProjectError):
     default_code = "analysis_error"
     """AI root cause analysis failed or could not be read."""
@@ -78,8 +84,13 @@ class LLMTimeoutError(AnalysisError):
 
 class LLMProviderError(AnalysisError):
     default_code = "llm_provider_error"
-    def __init__(self, message: str = "LLM provider request failed.", status_code: int = 502) -> None:
-        super().__init__(message, status_code)
+    def __init__(
+        self,
+        message: str = "LLM provider request failed.",
+        status_code: int = 502,
+        code: str | None = None,
+    ) -> None:
+        super().__init__(message, status_code, code=code)
 
 
 class PatchError(ProjectError):
