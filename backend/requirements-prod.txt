@@ -16,6 +16,6 @@ python-multipart==0.0.20
 # Environment Variable Management
 python-dotenv==1.0.1
 
-# Static Bug Scanners (Executed safely without running user code)
-ruff==0.9.6
-bandit==1.8.2
+# Durable storage for remote Docker validation jobs
+boto3==1.35.0
+psycopg[binary]==3.2.3

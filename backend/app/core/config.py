@@ -313,6 +313,22 @@ class Settings:
     validation_node_image: str = field(default_factory=_validation_node_image)
     validation_network_disabled: bool = field(default_factory=_validation_network_disabled)
 
+    # --- Remote Docker worker foundation (Stage 1) ---
+    remote_validation_enabled: bool = field(
+        default_factory=lambda: _env_bool("ROOTPATCH_REMOTE_VALIDATION_ENABLED", False)
+    )
+    database_url: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_DATABASE_URL"))
+    object_storage_bucket: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_BUCKET"))
+    object_storage_endpoint: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_ENDPOINT"))
+    object_storage_region: str = field(default_factory=lambda: _env_str("ROOTPATCH_OBJECT_STORAGE_REGION", "auto"))
+    object_storage_access_key_id: Optional[str] = field(
+        default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_ACCESS_KEY_ID")
+    )
+    object_storage_secret_access_key: Optional[str] = field(
+        default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_SECRET_ACCESS_KEY")
+    )
+    worker_token_hash: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_WORKER_TOKEN_HASH"))
+
     def __post_init__(self) -> None:
         if not self.workspace_dir.is_absolute():
             object.__setattr__(

@@ -136,6 +136,40 @@ export function ValidationPage({
       );
       setPatchHistory(historyRes.validations);
       await onValidationComplete();
+
+      if (report.status === "PENDING" || report.status === "RUNNING") {
+        const jobId = report.validation_id;
+        const projectId = project.project_id;
+        const patchId = effectivePatch.patch_id;
+        let cancelled = false;
+        const startedAt = Date.now();
+        while (!cancelled && Date.now() - startedAt < 300000) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          if (cancelled) break;
+          try {
+            const status = await client.getValidationJob(projectId, jobId);
+            if (status.project_id !== projectId) break;
+            if (status.report) {
+              setLatestReport(status.report);
+              const refreshed = await client.getPatchValidations(projectId, patchId);
+              if (!cancelled) {
+                setPatchHistory(refreshed.validations);
+              }
+            }
+            if (
+              status.status === "COMPLETED" ||
+              status.status === "FAILED" ||
+              status.status === "TIMED_OUT" ||
+              status.status === "BLOCKED" ||
+              status.status === "ERROR"
+            ) {
+              break;
+            }
+          } catch {
+            break;
+          }
+        }
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Patch validation request failed.");
     } finally {

@@ -15,6 +15,7 @@ import type {
   StructureResponse,
   UploadResponse,
   ValidationHistoryListResponse,
+  ValidationJobStatusResponse,
   ValidationReportResponse,
   ValidationRunRequest,
 } from "../types/api";
@@ -361,6 +362,17 @@ export class RootPatchApiClient {
   ): Promise<ValidationReportResponse> {
     return requestJson<ValidationReportResponse>(
       `/api/projects/${encodeURIComponent(projectId)}/validations/${encodeURIComponent(validationId)}`,
+      { method: "GET" },
+      this.baseUrl
+    );
+  }
+
+  getValidationJob(
+    projectId: string,
+    jobId: string
+  ): Promise<ValidationJobStatusResponse> {
+    return requestJson<ValidationJobStatusResponse>(
+      `/api/projects/${encodeURIComponent(projectId)}/validation-jobs/${encodeURIComponent(jobId)}`,
       { method: "GET" },
       this.baseUrl
     );

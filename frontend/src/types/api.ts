@@ -448,6 +448,23 @@ export interface ValidationReportResponse {
   validated_at: string;
 }
 
+export interface ValidationJobStatusResponse {
+  job_id: string;
+  project_id: string;
+  patch_id: string;
+  status: string;
+  worker_id?: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  created_at?: string | null;
+  claimed_at?: string | null;
+  heartbeat_at?: string | null;
+  completed_at?: string | null;
+  lease_expires_at?: string | null;
+  error_message?: string | null;
+  report?: ValidationReportResponse | null;
+}
+
 export interface ValidationHistoryListResponse {
   project_id: string;
   patch_id?: string | null;

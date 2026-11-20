@@ -8,6 +8,7 @@ from app.api.routes.patches import router as patches_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.scans import router as scans_router
 from app.api.routes.validations import router as validations_router
+from app.api.routes.worker import router as worker_router
 
 api_router = APIRouter(prefix="/api")
 
@@ -17,3 +18,4 @@ api_router.include_router(scans_router)
 api_router.include_router(analysis_router)
 api_router.include_router(patches_router)
 api_router.include_router(validations_router)
+api_router.include_router(worker_router)
