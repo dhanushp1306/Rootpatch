@@ -1,155 +1,416 @@
 # RootPatch
 
-Explainable software bug detection and repair system (hackathon prototype).
+RootPatch is an AI-powered automated debugging and code repair platform. It uploads a project archive, performs static analysis, generates AI root-cause explanations, proposes unified-diff patches, requires explicit human approval before application, creates backups, and validates applied patches inside isolated Docker containers.
 
-Reference documents: `Rootpatch_Agent_Rules.md`, `Rootpatch_Project_Plan.md`.
+The goal is to reduce manual debugging effort while keeping code changes reviewable, reversible, and security-bounded.
 
-## Backend quick start
+## Table of Contents
+
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Repository Structure](#repository-structure)
+- [Local Setup](#local-setup)
+- [Environment Configuration](#environment-configuration)
+- [Security](#security)
+- [Deployment](#deployment)
+- [Remote Validation Worker](#remote-validation-worker)
+- [Testing](#testing)
+- [Limitations and Future Improvements](#limitations-and-future-improvements)
+- [Screenshots](#screenshots)
+- [License](#license)
+
+## Key Features
+
+### Fully tested locally
+
+- ZIP project upload with size, file-count, and extraction limits.
+- Safe extraction with symlink rejection and path confinement.
+- Project inspection, language detection, dependency manifests, and structure browsing.
+- Static analysis using Python AST checks, Ruff, and Bandit.
+- AI root-cause analysis with pluggable LLM providers.
+- Automated unified-diff patch generation.
+- Patch review, approval, rejection, and controlled application.
+- Immutable pre-application backups.
+- SHA-256 integrity verification for applied patches.
+- Patch application audit history.
+- Isolated Docker container validation with baseline regression comparison.
+- Validation history and report persistence.
+- Frontend status-gated resource loading and project switching protection.
+
+### Implemented and tested at unit/integration level
+
+- Remote validation job management with Supabase PostgreSQL.
+- Atomic job claiming with `FOR UPDATE SKIP LOCKED`.
+- Worker authentication using a SHA-256-hashed bearer token.
+- Job leases, heartbeats, expiry, and requeue handling.
+- Supabase Storage snapshot upload and download.
+- Windows worker with outbound HTTPS polling and restricted Docker execution.
+- Frontend polling for remote validation job status.
+
+### Implemented but not end-to-end verified
+
+- Full remote validation workflow across Vercel, Render, Supabase, Cloudflare R2/Supabase Storage, and a local Windows worker.
+- Durable storage of all project workspaces on Render Free.
+- Windows worker running as an unattended service.
+- Baseline regression comparison in the remote validation result path.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U[Developer Browser] --> F[Vercel Frontend<br/>React + TypeScript + Vite]
+    F --> B[Render Backend<br/>FastAPI + Uvicorn]
+    B --> L[LLM Provider<br/>Gemini / Groq / xAI]
+    B --> P[Supabase PostgreSQL<br/>Validation job metadata]
+    B --> S[Supabase Storage<br/>Validation snapshots]
+    B --> D[Docker Engine<br/>Local or VPS validation]
+    W[Windows Worker<br/>Python + Docker Desktop] --> B
+    W --> D
+```
+
+### Core workflow
+
+```text
+Upload -> Inspect -> Static Scan -> AI Analysis -> Patch Generation -> Review -> Approval -> Apply -> Docker Validation -> History
+```
+
+### Remote validation workflow
+
+```text
+Vercel Frontend -> Render Backend -> PostgreSQL job record -> R2/Supabase snapshot -> Windows worker -> Restricted Docker container -> Result submission -> Render persistence -> Frontend polling
+```
+
+Remote validation is disabled by default. Set `ROOTPATCH_REMOTE_VALIDATION_ENABLED=true` only after all infrastructure is configured and tested.
+
+## Technology Stack
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+
+### Backend
+- Python
+- FastAPI
+- Uvicorn
+
+### AI
+- Google Gemini
+- Groq
+- xAI / Grok
+
+### Database and storage
+- PostgreSQL
+- Supabase PostgreSQL
+- Supabase Storage
+
+### Validation
+- Docker
+- pytest
+- Python-based Windows worker
+
+Redis is not used in this project.
+
+## Repository Structure
+
+```text
+Rootpatch/
+├── backend/                  # FastAPI application
+│   ├── app/                  # API, services, schemas, utilities
+│   ├── migrations/           # PostgreSQL migrations
+│   ├── tests/                # Backend test suite
+│   ├── requirements.txt      # Development dependencies
+│   └── requirements-prod.txt # Pinned production dependencies
+├── frontend/                 # React + Vite + TypeScript dashboard
+│   ├── src/                  # Application source
+│   ├── public/               # Static assets, including favicon
+│   └── package.json
+├── worker/                   # Windows remote validation worker
+├── deploy/                   # Caddy, systemd, environment template, deployment guide
+├── docker/                   # Python validation image
+└── README.md
+```
+
+## Local Setup
+
+### Prerequisites
+
+- Python 3.12
+- Node.js 20 LTS
+- Docker Desktop with Linux containers enabled
+- Git
+
+### Backend
 
 ```bash
 cd backend
 python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+
+# Windows
+.venv\Scripts\activate
+
+# macOS/Linux
+source .venv/bin/activate
+
 python -m pip install -r requirements.txt
+cp .env.example .env
+```
+
+Edit `backend/.env` with your provider and limits. Then start the backend:
+
+```bash
 python -m uvicorn main:app --reload --port 8000
 ```
 
-Interactive API docs: http://localhost:8000/docs
+Interactive API docs are available at:
 
-## Tests
+```text
+http://localhost:8000/docs
+```
+
+Health check:
+
+```text
+http://localhost:8000/api/health
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # optional: defaults to http://localhost:8000
+npm run dev
+```
+
+Frontend dev server runs at:
+
+```text
+http://localhost:5173
+```
+
+### Docker validation image
+
+```bash
+docker build -t rootpatch-python-validate:latest -f docker/Dockerfile.python-validate .
+
+docker run --rm \
+  --network none \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --user 65534:65534 \
+  rootpatch-python-validate:latest pytest --version
+```
+
+Expected output:
+
+```text
+pytest 8.3.4
+```
+
+### Environment configuration
+
+Backend variables are documented in `backend/.env.example`. Production values belong in `/etc/rootpatch/rootpatch.env` on the target server, never in committed files.
+
+Important variables include:
+
+| Variable | Purpose |
+|---|---|
+| `ROOTPATCH_WORKSPACE_DIR` | Workspace root for uploaded projects |
+| `ROOTPATCH_MAX_UPLOAD_BYTES` | Maximum ZIP upload size |
+| `ROOTPATCH_LLM_PROVIDER` | `gemini`, `openai`, `xai`, or `grok` |
+| `ROOTPATCH_LLM_MODEL` | Provider model name |
+| `ROOTPATCH_LLM_API_KEY` | LLM API key |
+| `ROOTPATCH_LLM_BASE_URL` | Optional provider base URL |
+| `ROOTPATCH_CORS_ORIGINS` | Comma-separated allowed origins |
+| `ROOTPATCH_VALIDATION_PYTHON_IMAGE` | Python validation image |
+| `ROOTPATCH_VALIDATION_NODE_IMAGE` | Node validation image |
+| `ROOTPATCH_VALIDATION_NETWORK_DISABLED` | Disable container network access |
+| `ROOTPATCH_REMOTE_VALIDATION_ENABLED` | Enable remote worker mode |
+| `ROOTPATCH_DATABASE_URL` | Supabase PostgreSQL connection string |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key |
+| `ROOTPATCH_OBJECT_STORAGE_BUCKET` | Supabase Storage bucket name |
+| `ROOTPATCH_WORKER_TOKEN_HASH` | SHA-256 hash of worker token |
+
+Frontend production variable:
+
+| Variable | Purpose |
+|---|---|
+| `VITE_API_BASE_URL` | Backend origin for separate frontend/backend deployments |
+
+For local development, `VITE_API_BASE_URL` may be unset; the frontend falls back to `http://localhost:8000`.
+
+## Security
+
+RootPatch applies multiple security controls:
+
+- ZIP path traversal protection.
+- Extraction limits for file count, total size, and individual file size.
+- Workspace path confinement with `is_within_directory` checks.
+- Uploaded code is never executed directly on the host.
+- Patch validation runs only inside Docker containers.
+- Docker containers use `--network none`, `--cap-drop ALL`, `--security-opt no-new-privileges:true`, `--read-only`, a tmpfs `/tmp`, and CPU, memory, and PID limits.
+- Containers run as non-root user `65534:65534`.
+- Patch approval is explicit and separate from application.
+- Patch application is atomic and creates immutable backups.
+- SHA-256 integrity checks protect applied files.
+- Worker authentication uses a SHA-256-hashed bearer token with constant-time comparison.
+- CORS origins are loaded from environment configuration.
+- Secrets are never committed; `.env` files are ignored.
+
+Docker container restrictions are defense-in-depth. They reduce the attack surface of validated project code but do not provide complete host isolation. Access to the Docker daemon is effectively root-equivalent on the host.
+
+## Deployment
+
+### Frontend (Vercel)
+
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Environment variable: `VITE_API_BASE_URL=https://rootpatch.onrender.com`
+
+### Backend (Render)
+
+- Root directory: `backend`
+- Build command: `pip install --no-cache-dir -r requirements-prod.txt`
+- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1`
+- Python version: `3.12` via `backend/.python-version`
+- Health endpoint: `https://rootpatch.onrender.com/api/health`
+
+### Supabase PostgreSQL
+
+- Apply `backend/migrations/001_create_validation_jobs.sql` using the Supabase SQL Editor.
+- Configure `ROOTPATCH_DATABASE_URL` in Render.
+- Use `sslmode=require`.
+- The transaction pooler is recommended for Render.
+
+### Supabase Storage
+
+- Create a private bucket named `rootpatch-validation`.
+- Configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `ROOTPATCH_OBJECT_STORAGE_BUCKET`.
+- The service-role key must remain backend-only.
+
+### Optional Windows remote validation worker
+
+1. Install Python 3.12 and Docker Desktop in Linux container mode.
+2. Build or pull `rootpatch-python-validate:latest`.
+3. Configure `worker/.env`.
+4. Run:
+
+```bash
+python main.py
+```
+
+The worker polls Render over outbound HTTPS and executes validation inside restricted Docker containers.
+
+### Free-hosting limitations
+
+- Render Free has an ephemeral filesystem.
+- Project uploads and validation reports are not durable on Render unless stored externally.
+- Supabase and Supabase Storage are required for durable remote validation data.
+- Render Free may sleep, delaying worker job processing.
+- Remote validation is disabled by default.
+
+## Remote Validation Worker
+
+The remote worker architecture is implemented but not end-to-end verified.
+
+Components:
+
+- Backend creates immutable patched and baseline snapshots.
+- Snapshots are uploaded to Supabase Storage.
+- Job metadata is stored in Supabase PostgreSQL.
+- The Windows worker claims jobs atomically.
+- The worker verifies SHA-256 checksums.
+- The worker runs tests inside restricted Docker containers.
+- The worker submits bounded results back to Render.
+- The frontend polls job status and displays the final report.
+
+Do not claim remote validation is production-ready until a complete end-to-end test has passed.
+
+## Testing
+
+### Backend
 
 ```bash
 cd backend
 python -m pytest
 ```
 
-Tests use temporary directories only; they never touch `backend/workspace/`.
+Latest verified result:
 
-## Frontend (`frontend/`)
+- `192 passed, 4 skipped, 1 warning`
 
-React + Vite + TypeScript + Tailwind CSS dashboard for the complete RootPatch workflow (upload, structure explorer, static scan, AI root-cause analysis, patch review/approval/application, isolated container validation, and audit history).
-
-```bash
-cd frontend
-npm install
-cp .env.example .env   # optional: defaults VITE_API_BASE_URL=http://localhost:8000
-npm run dev
-```
-
-Frontend dev server runs at `http://localhost:5173` (proxying `/api` to `VITE_API_BASE_URL`).
-
-### Frontend verification commands
+### Frontend
 
 ```bash
 cd frontend
-npm test        # Run Vitest + React Testing Library suite
+npm test
 npm run typecheck
-npm run build   # Production TypeScript check & Vite bundle into frontend/dist
+npm run build
 ```
 
-## API
+Latest verified result:
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/health` | Health check |
-| POST | `/api/projects/upload` | Upload a `.zip` (multipart field `file`); safely extracts and inspects it |
-| GET | `/api/projects/{project_id}` | Project metadata + inspection report |
-| GET | `/api/projects/{project_id}/structure` | Directory/file tree |
-| GET | `/api/projects/{project_id}/status` | Availability of project, structure, scan, analysis, patches and validations (never 404s for merely-missing optional data) |
-| POST | `/api/projects/{project_id}/scan` | Run static bug detection (AST, Ruff, Bandit) on uploaded Python code |
-| GET | `/api/projects/{project_id}/scan` | Retrieve the latest saved scan report for a project |
-| POST | `/api/projects/{project_id}/analyze` | Generate AI root cause analysis from the latest scan results |
-| GET | `/api/projects/{project_id}/analysis` | Retrieve the latest saved root cause analysis report |
-| GET | `/api/projects/{project_id}/analysis/{analysis_id}` | Retrieve an individual root cause analysis record |
-| POST | `/api/projects/{project_id}/patches/generate` | Generate and validate unified-diff patches from scan & analysis results |
-| GET | `/api/projects/{project_id}/patches` | Retrieve the latest generated patch batch for a project |
-| GET | `/api/projects/{project_id}/patches/history` | Retrieve patch application audit history |
-| GET | `/api/projects/{project_id}/patches/{patch_id}` | Retrieve an individual patch record |
-| GET | `/api/projects/{project_id}/patches/{patch_id}/review` | Retrieve developer review details and live before/after code comparison |
-| POST | `/api/projects/{project_id}/patches/{patch_id}/approve` | Explicitly approve a validated patch (does not apply it) |
-| POST | `/api/projects/{project_id}/patches/{patch_id}/reject` | Explicitly reject a patch so it remains unapplied |
-| POST | `/api/projects/{project_id}/patches/{patch_id}/apply` | Revalidate and atomically apply an explicitly approved patch |
-| POST | `/api/projects/{project_id}/patches/{patch_id}/validate` | Run isolated container test validation & baseline regression check on an applied patch |
-| GET | `/api/projects/{project_id}/patches/{patch_id}/validations` | Retrieve validation run history for a specific patch |
-| GET | `/api/projects/{project_id}/validations` | Retrieve all validation runs persisted for a project |
-| GET | `/api/projects/{project_id}/validations/{validation_id}` | Retrieve an individual validation report |
+- `31 passed`
+- TypeScript typecheck: passed
+- Production build: passed
 
-Error responses use `{"detail": "<message>"}`. Status codes: 201 created, 400 invalid/unsafe
-archive, 404 unknown project, scan, analysis, patch, or validation report, 409 invalid patch
-state (e.g. unapplied patch validation) or stale target, 413 size/count limit exceeded, 415
-unsupported file type, 422 invalid diff, unsafe command override, or missing form field, 429 LLM
-rate limit, 502 LLM provider error, 503 missing LLM configuration, 504 LLM timeout.
+### Worker
 
-## Error codes and project status
-
-Every API error keeps the legacy `detail` string and adds a machine-readable `code`:
-
-```json
-{ "detail": "No analysis results found for this project.", "code": "analysis_not_found" }
+```bash
+cd worker
+python -m py_compile config.py client.py runner.py main.py
 ```
 
-Not-found codes: `project_not_found`, `scan_not_found`, `analysis_not_found`, `analysis_item_not_found`,
-`patches_not_found` (nothing generated yet), `patch_not_found` (unknown patch id), `validation_not_found`.
-Other codes include `llm_not_configured`, `llm_rate_limited`, `llm_timeout`, `llm_provider_error`,
-`patch_conflict`, `patch_invalid`, `validation_isolation_unavailable`, `analysis_error`, `scan_error`, `patch_error`.
+Verified checks:
 
-`GET /api/projects/{id}/status` reports each resource as `available`, `missing` (not generated yet — normal for
-new projects) or `error` (stored artifact exists but is unreadable). Nothing is fabricated.
+- Syntax compilation passed
+- Safe ZIP extraction passed
+- Path traversal rejection passed
+- Restricted Docker command construction passed
 
-The frontend loads the project and its status first, and requests scan / analysis / patches / patch history /
-validations **only when the status says they exist**. Loads are de-duplicated (React StrictMode) and a token
-guard prevents a slow response for a previous project from overwriting the active one. Against an older backend
-without `/status`, it falls back to 404-tolerant probing.
+### Docker
 
-## Upload workspace and limits
+```bash
+docker build -t rootpatch-python-validate:latest -f docker/Dockerfile.python-validate .
+```
 
-Each upload gets an isolated directory `backend/workspace/<project_id>/`:
+Verified:
 
-- `original/upload.zip` – read-only copy of the upload
-- `source/` – extracted working copy (uploaded code is never executed directly on the host)
-- `metadata.json` – project metadata and inspection report
-- `scan_result.json` – latest Step 3 static bug detection report
-- `analysis_result.json` – Step 4 root cause analysis report and history
-- `patches_result.json` – Step 5/6 generated patches, validation, and review/application states
-- `patch_history.json` – Step 6 patch application audit log
-- `validation_result.json` – Step 7 isolated container test validation reports and history
-- `backups/` – immutable pre-application backups of modified source files
+- Image build passed
+- Image runs `pytest 8.3.4` under network isolation, read-only root filesystem, tmpfs, and non-root execution
 
-> **Container isolation (Step 7):** Patch validation executes tests exclusively inside a hardened,
-> network-disabled (`--network none`), read-only rootfs, non-root Docker container with CPU/memory/PID
-> limits and strict timeouts. If Docker is unavailable, validation reports status `BLOCKED` and
-> never falls back to host execution.
+### Remote validation E2E status
 
-The workspace is git-ignored. Configure via environment variables (defaults in parentheses):
+Not verified. Requires configured Supabase, Supabase Storage, Render, and a running Windows worker.
 
-| Variable | Default |
-|---|---|
-| `ROOTPATCH_WORKSPACE_DIR` | `backend/workspace` |
-| `ROOTPATCH_MAX_UPLOAD_BYTES` | 52428800 (50 MB) |
-| `ROOTPATCH_MAX_EXTRACTED_FILES` | 5000 |
-| `ROOTPATCH_MAX_EXTRACTED_TOTAL_BYTES` | 209715200 (200 MB) |
-| `ROOTPATCH_MAX_EXTRACTED_FILE_BYTES` | 26214400 (25 MB) |
-| `ROOTPATCH_MAX_STRUCTURE_NODES` | 5000 |
-| `ROOTPATCH_MAX_SCAN_FILES` | 1000 |
-| `ROOTPATCH_MAX_SCAN_FILE_BYTES` | 2097152 (2 MB) |
-| `ROOTPATCH_SCANNER_TIMEOUT_SECONDS` | 30 |
-| `ROOTPATCH_LLM_PROVIDER` | `gemini` (`gemini`, `openai`, `xai`, or `grok`) |
-| `ROOTPATCH_LLM_MODEL` | `gemini-4-hydrogen` (`grok-4.7` when provider is `xai` or `grok`) |
-| `ROOTPATCH_LLM_API_KEY` | unset (or `GEMINI_API_KEY` / `OPENAI_API_KEY` / `XAI_API_KEY`) |
-| `ROOTPATCH_LLM_BASE_URL` | provider default |
-| `ROOTPATCH_LLM_TIMEOUT_SECONDS` | 30 |
-| `ROOTPATCH_CONTEXT_LINES_BEFORE` | 20 |
-| `ROOTPATCH_CONTEXT_LINES_AFTER` | 20 |
-| `ROOTPATCH_MAX_CONTEXT_FILE_BYTES` | 524288 (512 KB) |
-| `ROOTPATCH_MAX_CONTEXT_CHARS_PER_FINDING` | 8000 |
-| `ROOTPATCH_MAX_TOTAL_CONTEXT_CHARS` | 32000 |
-| `ROOTPATCH_MAX_FINDINGS_PER_ANALYSIS` | 50 |
-| `ROOTPATCH_VALIDATION_TIMEOUT_SECONDS` | 60 |
-| `ROOTPATCH_VALIDATION_MEMORY_LIMIT` | `512m` |
-| `ROOTPATCH_VALIDATION_CPUS` | `1.0` |
-| `ROOTPATCH_VALIDATION_PIDS_LIMIT` | 64 |
-| `ROOTPATCH_MAX_VALIDATION_OUTPUT_BYTES` | 65536 (64 KB) |
-| `ROOTPATCH_VALIDATION_PYTHON_IMAGE` | `python:3.11-slim` |
-| `ROOTPATCH_VALIDATION_NODE_IMAGE` | `node:20-slim` |
-| `ROOTPATCH_VALIDATION_NETWORK_DISABLED` | `true` |
-| `ROOTPATCH_CORS_ORIGINS` | local Vite / port 3000 origins |
+## Limitations and Future Improvements
+
+- Remote Docker validation is implemented but not end-to-end verified.
+- Durable storage of all project workspaces is incomplete on Render Free.
+- Baseline regression comparison is not included in the remote result path.
+- Windows worker is not installed as a service.
+- Rate limiting and monitoring are not implemented.
+- No automated backup scheduling is configured.
+- Render Free service sleep may delay validation jobs.
+
+## Screenshots
+
+No screenshots are currently committed. Add images under `docs/screenshots/` and reference them here when available.
+
+Suggested filenames:
+
+- `docs/screenshots/dashboard.png`
+- `docs/screenshots/upload.png`
+- `docs/screenshots/findings.png`
+- `docs/screenshots/patch-review.png`
+- `docs/screenshots/validation.png`
+- `docs/screenshots/history.png`
+
+## License
+
+No license file is currently included in this repository. Add a `LICENSE` file before public distribution.
