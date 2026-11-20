@@ -81,8 +81,8 @@ def _client(monkeypatch):
         database_url="postgresql://example",
         worker_token_hash=_worker_token_hash(),
         object_storage_bucket="bucket",
-        object_storage_access_key_id="key",
-        object_storage_secret_access_key="secret",
+        supabase_url="https://example.supabase.co",
+        supabase_service_role_key="service-role-key",
     )
     app.dependency_overrides[get_settings] = lambda: test_settings
 

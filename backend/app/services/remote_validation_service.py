@@ -362,7 +362,7 @@ def validate_remote_patch(
         raise ProjectError("Remote Docker validation is disabled.", 409)
     if not settings.database_url:
         raise ProjectError("Remote validation job storage is not configured.", 503)
-    if not settings.object_storage_bucket or not settings.object_storage_access_key_id or not settings.object_storage_secret_access_key:
+    if not settings.supabase_url or not settings.supabase_service_role_key or not settings.object_storage_bucket:
         raise ProjectError("Remote validation object storage is not configured.", 503)
 
     load_project(project_id, settings)

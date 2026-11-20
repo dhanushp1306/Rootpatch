@@ -319,14 +319,12 @@ class Settings:
         default_factory=lambda: _env_bool("ROOTPATCH_REMOTE_VALIDATION_ENABLED", False)
     )
     database_url: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_DATABASE_URL"))
-    object_storage_bucket: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_BUCKET"))
-    object_storage_endpoint: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_ENDPOINT"))
-    object_storage_region: str = field(default_factory=lambda: _env_str("ROOTPATCH_OBJECT_STORAGE_REGION", "auto"))
-    object_storage_access_key_id: Optional[str] = field(
-        default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_ACCESS_KEY_ID")
+    supabase_url: Optional[str] = field(default_factory=lambda: _env_optional_str("SUPABASE_URL"))
+    supabase_service_role_key: Optional[str] = field(
+        default_factory=lambda: _env_optional_str("SUPABASE_SERVICE_ROLE_KEY")
     )
-    object_storage_secret_access_key: Optional[str] = field(
-        default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_SECRET_ACCESS_KEY")
+    object_storage_bucket: Optional[str] = field(
+        default_factory=lambda: _env_optional_str("ROOTPATCH_OBJECT_STORAGE_BUCKET")
     )
     worker_token_hash: Optional[str] = field(default_factory=lambda: _env_optional_str("ROOTPATCH_WORKER_TOKEN_HASH"))
 

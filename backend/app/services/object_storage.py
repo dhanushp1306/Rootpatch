@@ -1,60 +1,49 @@
-"""Durable object-storage helper for RootPatch validation snapshots.
+"""Supabase Storage helper for RootPatch validation snapshots.
 
-Stage 1 foundation: this module provides a small S3-compatible client for
-Cloudflare R2 or any S3-compatible object store. It is intentionally lazy so
-that importing it does not require boto3 unless storage operations are used.
+Stage 3 replaces the previous S3/R2 implementation with Supabase Storage.
+The backend uses the service-role key server-side only. The frontend and worker
+never receive Supabase credentials.
 """
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import quote
+
+import httpx
 
 from app.core.config import Settings
 
 
-@dataclass(frozen=True)
-class ObjectStorageConfig:
-    bucket: str
-    endpoint_url: Optional[str]
-    region: str
-    access_key_id: Optional[str]
-    secret_access_key: Optional[str]
-
-
 class ObjectStorage:
-    """Thin wrapper around an S3-compatible object store."""
+    """Thin wrapper around the Supabase Storage REST API."""
 
     def __init__(self, settings: Settings) -> None:
-        self.config = ObjectStorageConfig(
-            bucket=settings.object_storage_bucket or "",
-            endpoint_url=settings.object_storage_endpoint,
-            region=settings.object_storage_region,
-            access_key_id=settings.object_storage_access_key_id,
-            secret_access_key=settings.object_storage_secret_access_key,
-        )
-        if not self.config.bucket:
-            raise RuntimeError("ROOTPATCH_OBJECT_STORAGE_BUCKET is required for object storage.")
-        if not self.config.access_key_id or not self.config.secret_access_key:
-            raise RuntimeError(
-                "ROOTPATCH_OBJECT_STORAGE_ACCESS_KEY_ID and "
-                "ROOTPATCH_OBJECT_STORAGE_SECRET_ACCESS_KEY are required."
-            )
+        self.supabase_url = (settings.supabase_url or "").rstrip("/")
+        self.service_role_key = settings.supabase_service_role_key or ""
+        self.bucket = settings.object_storage_bucket or ""
 
-    def _client(self):
-        try:
-            import boto3
-        except ImportError as exc:
-            raise RuntimeError("boto3 is required for object storage operations.") from exc
+        if not self.supabase_url:
+            raise RuntimeError("SUPABASE_URL is required for Supabase Storage.")
+        if not self.service_role_key:
+            raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for Supabase Storage.")
+        if not self.bucket:
+            raise RuntimeError("ROOTPATCH_OBJECT_STORAGE_BUCKET is required for Supabase Storage.")
 
-        return boto3.client(
-            "s3",
-            endpoint_url=self.config.endpoint_url,
-            aws_access_key_id=self.config.access_key_id,
-            aws_secret_access_key=self.config.secret_access_key,
-            region_name=self.config.region,
-        )
+    def _auth_headers(self, content_type: Optional[str] = None) -> dict[str, str]:
+        headers = {
+            "Authorization": f"Bearer {self.service_role_key}",
+            "apikey": self.service_role_key,
+        }
+        if content_type:
+            headers["Content-Type"] = content_type
+        return headers
+
+    def _object_url(self, key: str) -> str:
+        if not key or ".." in key.split("/"):
+            raise ValueError("Unsafe object key.")
+        encoded_key = quote(key, safe="/")
+        return f"{self.supabase_url}/storage/v1/object/{self.bucket}/{encoded_key}"
 
     def upload_bytes(
         self,
@@ -63,40 +52,48 @@ class ObjectStorage:
         content_type: str = "application/zip",
         if_none_match: bool = False,
     ) -> None:
-        if not key or ".." in key.split("/"):
-            raise ValueError("Unsafe object key.")
-        params = {
-            "Bucket": self.config.bucket,
-            "Key": key,
-            "Body": data,
-            "ContentType": content_type,
-        }
+        headers = self._auth_headers(content_type)
         if if_none_match:
-            params["IfNoneMatch"] = "*"
+            headers["x-upsert"] = "false"
+
         try:
-            self._client().put_object(**params)
-        except Exception as exc:
-            raise RuntimeError("Failed to upload object to storage.") from exc
+            response = httpx.post(
+                self._object_url(key),
+                content=data,
+                headers=headers,
+                timeout=60.0,
+            )
+        except httpx.HTTPError as exc:
+            raise RuntimeError("Failed to upload object to Supabase Storage.") from exc
+
+        if response.status_code not in (200, 201):
+            raise RuntimeError("Failed to upload object to Supabase Storage.")
 
     def download_bytes(self, key: str) -> bytes:
-        if not key or ".." in key.split("/"):
-            raise ValueError("Unsafe object key.")
         try:
-            response = self._client().get_object(Bucket=self.config.bucket, Key=key)
-            return response["Body"].read()
-        except Exception as exc:
-            raise RuntimeError("Failed to download object from storage.") from exc
+            response = httpx.get(
+                self._object_url(key),
+                headers=self._auth_headers(),
+                timeout=60.0,
+            )
+        except httpx.HTTPError as exc:
+            raise RuntimeError("Failed to download object from Supabase Storage.") from exc
 
-    def create_presigned_get_url(self, key: str, expires_in: int = 300) -> str:
-        if not key or ".." in key.split("/"):
-            raise ValueError("Unsafe object key.")
-        return self._client().generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self.config.bucket, "Key": key},
-            ExpiresIn=expires_in,
-        )
+        if response.status_code == 404:
+            raise RuntimeError("Object not found in Supabase Storage.")
+        if response.status_code != 200:
+            raise RuntimeError("Failed to download object from Supabase Storage.")
+        return response.content
 
     def delete(self, key: str) -> None:
-        if not key or ".." in key.split("/"):
-            raise ValueError("Unsafe object key.")
-        self._client().delete_object(Bucket=self.config.bucket, Key=key)
+        try:
+            response = httpx.delete(
+                self._object_url(key),
+                headers=self._auth_headers(),
+                timeout=30.0,
+            )
+        except httpx.HTTPError as exc:
+            raise RuntimeError("Failed to delete object from Supabase Storage.") from exc
+
+        if response.status_code not in (200, 204, 404):
+            raise RuntimeError("Failed to delete object from Supabase Storage.")

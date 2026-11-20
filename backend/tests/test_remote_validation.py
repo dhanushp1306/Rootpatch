@@ -17,11 +17,9 @@ def _settings(tmp_path, *, remote_enabled=True, db=True, storage=True):
         workspace_dir=tmp_path,
         remote_validation_enabled=remote_enabled,
         database_url="postgresql://example" if db else None,
+        supabase_url="https://example.supabase.co" if storage else None,
+        supabase_service_role_key="service-role-key" if storage else None,
         object_storage_bucket="bucket" if storage else None,
-        object_storage_endpoint="https://example.r2.cloudflarestorage.com",
-        object_storage_region="auto",
-        object_storage_access_key_id="key" if storage else None,
-        object_storage_secret_access_key="secret" if storage else None,
         worker_token_hash="hash",
     )
 
