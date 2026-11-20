@@ -109,7 +109,7 @@ export function PatchReviewPage({
           <button
             type="button"
             onClick={onGoToUpload}
-            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+            className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
           >
             Go to Upload
           </button>
@@ -150,7 +150,7 @@ export function PatchReviewPage({
               <button
                 type="button"
                 onClick={onGoToFindings}
-                className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+                className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
               >
                 Open Bugs & Root Cause
               </button>
@@ -172,7 +172,7 @@ export function PatchReviewPage({
                     void handleGenerate();
                   }}
                   disabled={generating}
-                  className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+                  className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap"
                 >
                   {generating ? "Generating..." : "Generate Patches"}
                 </button>
@@ -180,7 +180,7 @@ export function PatchReviewPage({
                 <button
                   type="button"
                   onClick={onGoToFindings}
-                  className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+                  className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
                 >
                   Open Bugs & Root Cause
                 </button>
@@ -291,9 +291,9 @@ export function PatchReviewPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Patch queue */}
-        <div className="lg:col-span-4 rounded-lg border border-slate-200 bg-white divide-y divide-slate-200 overflow-hidden">
-          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+        <div className="lg:col-span-4 rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] divide-y divide-slate-200 overflow-hidden">
+          <div className="px-4 py-3 bg-[#E2DFF1] border-b border-[#D4CFF5]">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[#625D78]">
               Patch Queue ({patchList.length})
             </h2>
           </div>
@@ -308,19 +308,19 @@ export function PatchReviewPage({
                   setActionBanner(null);
                 }}
                 className={`w-full text-left px-4 py-3.5 transition-colors ${
-                  active ? "bg-blue-50" : "hover:bg-slate-50"
+                  active ? "bg-[#CFC5F0]" : "hover:bg-[#E2DFF1]"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <StatusText label={patch.status} />
-                  <span className="font-mono text-[11px] text-slate-500">
+                  <span className="font-mono text-[11px] text-[#625D78]">
                     +{patch.validation.lines_added} / -{patch.validation.lines_removed}
                   </span>
                 </div>
-                <p className="mt-1 text-sm font-semibold text-slate-900 truncate">
+                <p className="mt-1 text-sm font-semibold text-[#25213B] truncate">
                   {sanitizeSingleLine(patch.summary)}
                 </p>
-                <p className="mt-0.5 font-mono text-xs text-slate-500 truncate">
+                <p className="mt-0.5 font-mono text-xs text-[#625D78] truncate">
                   {sanitizeSingleLine(patch.file_path)}:{patch.line_number}
                 </p>
               </button>
@@ -355,20 +355,20 @@ export function PatchReviewPage({
                 />
               ) : null}
 
-              <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">
+              <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[#625D78]">
                       <StatusText label={review.status} />
                       <span aria-hidden="true">·</span>
                       <span>Approval: {review.approval_status}</span>
                       <span aria-hidden="true">·</span>
                       <span>Application: {review.application_status}</span>
                     </div>
-                    <h3 className="text-base font-semibold text-slate-900">
+                    <h3 className="text-base font-semibold text-[#25213B]">
                       {sanitizeSingleLine(review.summary)}
                     </h3>
-                    <p className="font-mono text-xs text-slate-600">
+                    <p className="font-mono text-xs text-[#625D78]">
                       {sanitizeSingleLine(review.file_path)} · Line {review.line_number} ·{" "}
                       {sanitizeSingleLine(review.rule_id)}
                     </p>
@@ -378,7 +378,7 @@ export function PatchReviewPage({
                     <button
                       type="button"
                       onClick={() => onValidatePatch(review.patch_id)}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-800 whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-800 whitespace-nowrap shrink-0"
                     >
                       <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
                       <span>Validate Applied Patch</span>
@@ -387,15 +387,15 @@ export function PatchReviewPage({
                 </div>
 
                 {review.finding_title || review.root_cause ? (
-                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3.5 text-xs space-y-1">
+                  <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3.5 text-xs space-y-1">
                     {review.finding_title ? (
-                      <p className="font-semibold text-slate-900">
+                      <p className="font-semibold text-[#25213B]">
                         Finding: {sanitizeSingleLine(review.finding_title)}
                         {review.finding_severity ? ` (${review.finding_severity})` : ""}
                       </p>
                     ) : null}
                     {review.root_cause ? (
-                      <p className="text-slate-700">
+                      <p className="text-[#25213B]">
                         <span className="font-semibold">Root Cause: </span>
                         {sanitizeDisplayText(review.root_cause)}
                       </p>
@@ -403,13 +403,13 @@ export function PatchReviewPage({
                   </div>
                 ) : null}
 
-                <p className="text-sm text-slate-700 leading-relaxed">
+                <p className="text-sm text-[#25213B] leading-relaxed">
                   {sanitizeDisplayText(review.explanation)}
                 </p>
 
-                <div className="text-xs text-slate-500 space-y-1">
+                <div className="text-xs text-[#625D78] space-y-1">
                   <p>
-                    <span className="font-semibold text-slate-700">Diff Validation Checks: </span>
+                    <span className="font-semibold text-[#25213B]">Diff Validation Checks: </span>
                     {review.validation.checks_passed.join(", ") || "None"}
                   </p>
                   <p className="font-mono">
@@ -419,7 +419,7 @@ export function PatchReviewPage({
                   </p>
                   {review.review_note ? (
                     <p>
-                      <span className="font-semibold text-slate-700">Review Note: </span>
+                      <span className="font-semibold text-[#25213B]">Review Note: </span>
                       {sanitizeDisplayText(review.review_note)}
                     </p>
                   ) : null}
@@ -431,11 +431,11 @@ export function PatchReviewPage({
                 </div>
 
                 {/* Backend-controlled review actions */}
-                <div className="border-t border-slate-200 pt-4 space-y-3">
+                <div className="border-t border-[#D4CFF5] pt-4 space-y-3">
                   <div>
                     <label
                       htmlFor="patch-review-note"
-                      className="block text-xs font-medium text-slate-700"
+                      className="block text-xs font-medium text-[#25213B]"
                     >
                       Optional Review Comment
                     </label>
@@ -445,7 +445,7 @@ export function PatchReviewPage({
                       value={reviewNote}
                       onChange={(e) => setReviewNote(e.target.value)}
                       placeholder="Add rationale for approval or rejection..."
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-[#C7C0F0] px-3 py-1.5 text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
 
@@ -454,7 +454,7 @@ export function PatchReviewPage({
                       type="button"
                       onClick={handleApprove}
                       disabled={!review.can_approve || actionBusy !== null}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-45 whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#6545D5] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#5535C5] disabled:opacity-45 whitespace-nowrap shrink-0"
                     >
                       {actionBusy === "approve" ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -468,7 +468,7 @@ export function PatchReviewPage({
                       type="button"
                       onClick={handleReject}
                       disabled={!review.can_reject || actionBusy !== null}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-45 whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-[#DCD7F2] px-3.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-45 whitespace-nowrap shrink-0"
                     >
                       {actionBusy === "reject" ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -482,7 +482,7 @@ export function PatchReviewPage({
                       type="button"
                       onClick={handleApply}
                       disabled={!review.can_apply || actionBusy !== null}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-45 whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-45 whitespace-nowrap shrink-0"
                     >
                       {actionBusy === "apply" ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -503,14 +503,14 @@ export function PatchReviewPage({
               </section>
 
               <section className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-[#625D78]">
                   Unified Diff
                 </h4>
                 <UnifiedDiffView diff={review.unified_diff} />
               </section>
 
               <section className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-[#625D78]">
                   Before / After Comparison
                 </h4>
                 <CodeComparisonView

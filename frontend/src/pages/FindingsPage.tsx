@@ -94,7 +94,7 @@ export function FindingsPage({
           <button
             type="button"
             onClick={onGoToUpload}
-            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+            className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
           >
             Go to Upload
           </button>
@@ -179,12 +179,12 @@ export function FindingsPage({
   return (
     <div className="space-y-6">
       {/* Pipeline control header */}
-      <section className="rounded-lg border border-slate-200 bg-white p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-[#25213B]">
             Static Detection & AI Root-Cause Pipeline
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[#625D78]">
             1. Run Python AST, Ruff, and Bandit scanners · 2. Explain root causes with bounded
             workspace context · 3. Generate validated unified diffs
           </p>
@@ -195,7 +195,7 @@ export function FindingsPage({
             type="button"
             onClick={handleRunScan}
             disabled={runningScan}
-            className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#6545D5] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap shrink-0"
           >
             {runningScan ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -209,12 +209,12 @@ export function FindingsPage({
             type="button"
             onClick={handleRunAnalysis}
             disabled={runningAnalysis}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3.5 py-2 text-xs font-semibold text-[#25213B] hover:bg-[#E2DFF1] disabled:opacity-50 whitespace-nowrap shrink-0"
           >
             {runningAnalysis ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
             ) : (
-              <Sparkles className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
+              <Sparkles className="w-3.5 h-3.5 text-[#6545D5]" aria-hidden="true" />
             )}
             <span>{analysis ? "Re-run Root-Cause Analysis" : "Analyze Root Causes"}</span>
           </button>
@@ -236,12 +236,12 @@ export function FindingsPage({
                 ? "Root-cause analysis has zero findings"
                 : undefined
             }
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3.5 py-2 text-xs font-semibold text-[#25213B] hover:bg-[#E2DFF1] disabled:opacity-50 whitespace-nowrap shrink-0"
           >
             {generatingBatch ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
             ) : (
-              <Wrench className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
+              <Wrench className="w-3.5 h-3.5 text-[#6545D5]" aria-hidden="true" />
             )}
             <span>Generate All Patches</span>
           </button>
@@ -258,7 +258,7 @@ export function FindingsPage({
             <button
               type="button"
               onClick={onGoToPatches}
-              className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 whitespace-nowrap"
+              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 whitespace-nowrap"
             >
               Open Patch Review
             </button>
@@ -275,12 +275,12 @@ export function FindingsPage({
               type="button"
               onClick={handleRunAnalysis}
               disabled={runningAnalysis || runningScan}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3.5 py-2 text-xs font-semibold text-[#25213B] hover:bg-[#E2DFF1] disabled:opacity-50 whitespace-nowrap"
             >
               {runningAnalysis ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
+                <Sparkles className="w-3.5 h-3.5 text-[#6545D5]" aria-hidden="true" />
               )}
               <span>Scan and Analyze</span>
             </button>
@@ -326,7 +326,7 @@ export function FindingsPage({
                   type="button"
                   onClick={handleRunAnalysis}
                   disabled={runningAnalysis}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#6545D5] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap"
                 >
                   {runningAnalysis ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -351,7 +351,7 @@ export function FindingsPage({
                   type="button"
                   onClick={() => handleGeneratePatches()}
                   disabled={generatingBatch}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#6545D5] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap"
                 >
                   {generatingBatch ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -367,16 +367,16 @@ export function FindingsPage({
             {Object.entries(scan.scanner_details).map(([toolName, details]) => (
               <div
                 key={toolName}
-                className="rounded-lg border border-slate-200 bg-white p-4 flex items-center justify-between gap-3"
+                className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-4 flex items-center justify-between gap-3"
               >
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#625D78]">
                     {sanitizeSingleLine(toolName)}
                   </p>
-                  <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">
+                  <p className="mt-1 text-lg font-bold text-[#25213B] tabular-nums">
                     {details.findings_count} findings
                   </p>
-                  <p className="text-xs text-slate-500 tabular-nums">{details.duration_ms} ms</p>
+                  <p className="text-xs text-[#625D78] tabular-nums">{details.duration_ms} ms</p>
                 </div>
                 <StatusText label={details.status} />
               </div>
@@ -393,19 +393,19 @@ export function FindingsPage({
 
           {/* Shared root cause groups if any */}
           {analysis && analysis.shared_root_cause_groups.length > 0 ? (
-            <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-900">Shared Root-Cause Groups</h3>
+            <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-3">
+              <h3 className="text-sm font-semibold text-[#25213B]">Shared Root-Cause Groups</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {analysis.shared_root_cause_groups.map((group) => (
                   <div
                     key={group.group_id}
-                    className="rounded-md border border-slate-200 bg-slate-50 p-3.5 text-xs space-y-1"
+                    className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3.5 text-xs space-y-1"
                   >
-                    <p className="font-semibold text-slate-900">
+                    <p className="font-semibold text-[#25213B]">
                       {sanitizeSingleLine(group.shared_cause)}
                     </p>
-                    <p className="text-slate-600">{sanitizeDisplayText(group.explanation)}</p>
-                    <p className="font-mono text-slate-500">
+                    <p className="text-[#625D78]">{sanitizeDisplayText(group.explanation)}</p>
+                    <p className="font-mono text-[#625D78]">
                       Findings: {group.finding_ids.join(", ")}
                     </p>
                   </div>
@@ -418,7 +418,7 @@ export function FindingsPage({
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
             <div className="relative flex-1 max-w-md">
               <Search
-                className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                className="w-4 h-4 text-[#625D78] absolute left-3 top-1/2 -translate-y-1/2"
                 aria-hidden="true"
               />
               <input
@@ -427,7 +427,7 @@ export function FindingsPage({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filter by file path, rule ID, or title..."
                 aria-label="Filter findings"
-                className="w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] pl-9 pr-3 py-2 text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
               />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -435,7 +435,7 @@ export function FindingsPage({
                 aria-label="Filter by severity"
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3 py-2 text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
               >
                 <option value="ALL">All Severities</option>
                 <option value="CRITICAL">CRITICAL</option>
@@ -448,7 +448,7 @@ export function FindingsPage({
                 aria-label="Filter by scanner tool"
                 value={toolFilter}
                 onChange={(e) => setToolFilter(e.target.value)}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3 py-2 text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
               >
                 <option value="ALL">All Tools</option>
                 <option value="ast">AST</option>
@@ -476,7 +476,7 @@ export function FindingsPage({
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-5 rounded-lg border border-slate-200 bg-white divide-y divide-slate-200 overflow-hidden">
+              <div className="lg:col-span-5 rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] divide-y divide-slate-200 overflow-hidden">
                 {filteredFindings.map((finding) => {
                   const selected = activeFinding?.id === finding.id;
                   const hasAnalysis = analysisByFindingId.has(finding.id);
@@ -486,24 +486,24 @@ export function FindingsPage({
                       type="button"
                       onClick={() => setSelectedFindingId(finding.id)}
                       className={`w-full text-left px-4 py-3.5 transition-colors ${
-                        selected ? "bg-blue-50" : "hover:bg-slate-50"
+                        selected ? "bg-[#CFC5F0]" : "hover:bg-[#E2DFF1]"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <StatusText label={finding.severity} />
-                        <span className="font-mono text-[11px] text-slate-500">
+                        <span className="font-mono text-[11px] text-[#625D78]">
                           {finding.tool} · {sanitizeSingleLine(finding.rule_id)}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm font-semibold text-slate-900 line-clamp-2">
+                      <p className="mt-1 text-sm font-semibold text-[#25213B] line-clamp-2">
                         {sanitizeSingleLine(finding.title)}
                       </p>
-                      <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                      <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[#625D78]">
                         <span className="font-mono truncate">
                           {sanitizeSingleLine(finding.file_path)}:{finding.line_number}
                         </span>
                         {hasAnalysis ? (
-                          <span className="text-blue-700 font-medium whitespace-nowrap shrink-0">
+                          <span className="text-[#6545D5] font-medium whitespace-nowrap shrink-0">
                             Analyzed
                           </span>
                         ) : null}
@@ -516,20 +516,20 @@ export function FindingsPage({
               <div className="lg:col-span-7 space-y-4">
                 {activeFinding ? (
                   <>
-                    <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">
+                    <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-4">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-[#625D78]">
                             <StatusText label={activeFinding.severity} />
                             <span aria-hidden="true">·</span>
                             <span>Confidence: {activeFinding.confidence}</span>
                             <span aria-hidden="true">·</span>
                             <span className="font-mono">{sanitizeSingleLine(activeFinding.rule_id)}</span>
                           </div>
-                          <h3 className="mt-1.5 text-base font-semibold text-slate-900">
+                          <h3 className="mt-1.5 text-base font-semibold text-[#25213B]">
                             {sanitizeSingleLine(activeFinding.title)}
                           </h3>
-                          <p className="mt-0.5 font-mono text-xs text-slate-600 tabular-nums">
+                          <p className="mt-0.5 font-mono text-xs text-[#625D78] tabular-nums">
                             {sanitizeSingleLine(activeFinding.file_path)} · Line{" "}
                             {activeFinding.line_number}
                             {activeFinding.column ? `:${activeFinding.column}` : ""}
@@ -545,7 +545,7 @@ export function FindingsPage({
                               ? "Run root-cause analysis before generating a patch for this finding"
                               : "Generate a targeted unified diff patch"
                           }
-                          className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#6545D5] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap shrink-0"
                         >
                           {generatingForFindingId === activeFinding.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -556,32 +556,32 @@ export function FindingsPage({
                         </button>
                       </div>
 
-                      <p className="text-sm text-slate-700">
+                      <p className="text-sm text-[#25213B]">
                         {sanitizeDisplayText(activeFinding.description)}
                       </p>
 
                       {activeFinding.evidence ? (
                         <div>
-                          <p className="text-xs font-semibold text-slate-700 mb-1">
+                          <p className="text-xs font-semibold text-[#25213B] mb-1">
                             Code Evidence
                           </p>
-                          <pre className="rounded-md border border-slate-200 bg-slate-950 p-3 font-mono text-xs text-slate-100 overflow-x-auto whitespace-pre">
+                          <pre className="rounded-lg border border-[#D4CFF5] bg-slate-950 p-3 font-mono text-xs text-slate-100 overflow-x-auto whitespace-pre">
                             {sanitizeDisplayText(activeFinding.evidence)}
                           </pre>
                         </div>
                       ) : null}
 
                       {activeFinding.suggested_fix ? (
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-                          <span className="font-semibold text-slate-900">Scanner Hint: </span>
+                        <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3 text-xs text-[#25213B]">
+                          <span className="font-semibold text-[#25213B]">Scanner Hint: </span>
                           {sanitizeDisplayText(activeFinding.suggested_fix)}
                         </div>
                       ) : null}
                     </section>
 
-                    <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-3">
+                    <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-sm font-semibold text-slate-900">
+                        <h4 className="text-sm font-semibold text-[#25213B]">
                           AI Root-Cause Analysis
                         </h4>
                         {activeAnalysis ? (
@@ -590,7 +590,7 @@ export function FindingsPage({
                       </div>
 
                       {!activeAnalysis ? (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[#625D78]">
                           {analysis
                             ? "No root-cause analysis record matched this finding."
                             : "Run Analyze Root Causes above to generate an evidence-based explanation."}
@@ -598,48 +598,48 @@ export function FindingsPage({
                       ) : (
                         <div className="space-y-3 text-xs">
                           <div>
-                            <p className="font-semibold text-slate-700">Root Cause</p>
-                            <p className="mt-0.5 text-sm font-medium text-slate-900">
+                            <p className="font-semibold text-[#25213B]">Root Cause</p>
+                            <p className="mt-0.5 text-sm font-medium text-[#25213B]">
                               {sanitizeDisplayText(activeAnalysis.root_cause)}
                             </p>
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-700">Technical Explanation</p>
-                            <p className="mt-0.5 text-slate-700 leading-relaxed">
+                            <p className="font-semibold text-[#25213B]">Technical Explanation</p>
+                            <p className="mt-0.5 text-[#25213B] leading-relaxed">
                               {sanitizeDisplayText(activeAnalysis.technical_explanation)}
                             </p>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                              <p className="font-semibold text-slate-700">Affected Component</p>
-                              <p className="mt-1 font-mono text-slate-900">
+                            <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                              <p className="font-semibold text-[#25213B]">Affected Component</p>
+                              <p className="mt-1 font-mono text-[#25213B]">
                                 {sanitizeSingleLine(activeAnalysis.affected_component)}
                               </p>
                             </div>
-                            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                              <p className="font-semibold text-slate-700">Confidence</p>
-                              <p className="mt-1 text-slate-900">
+                            <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                              <p className="font-semibold text-[#25213B]">Confidence</p>
+                              <p className="mt-1 text-[#25213B]">
                                 {activeAnalysis.confidence} —{" "}
                                 {sanitizeSingleLine(activeAnalysis.confidence_reason)}
                               </p>
                             </div>
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-700">Impact</p>
-                            <p className="mt-0.5 text-slate-700">
+                            <p className="font-semibold text-[#25213B]">Impact</p>
+                            <p className="mt-0.5 text-[#25213B]">
                               {sanitizeDisplayText(activeAnalysis.impact)}
                             </p>
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-700">Recommended Fix</p>
-                            <p className="mt-0.5 text-slate-700">
+                            <p className="font-semibold text-[#25213B]">Recommended Fix</p>
+                            <p className="mt-0.5 text-[#25213B]">
                               {sanitizeDisplayText(activeAnalysis.recommended_fix)}
                             </p>
                           </div>
                           {activeAnalysis.evidence.length > 0 ? (
                             <div>
-                              <p className="font-semibold text-slate-700">Supporting Evidence</p>
-                              <ul className="mt-1 list-disc pl-4 space-y-1 text-slate-700">
+                              <p className="font-semibold text-[#25213B]">Supporting Evidence</p>
+                              <ul className="mt-1 list-disc pl-4 space-y-1 text-[#25213B]">
                                 {activeAnalysis.evidence.map((ev, i) => (
                                   <li key={i}>{sanitizeDisplayText(ev)}</li>
                                 ))}

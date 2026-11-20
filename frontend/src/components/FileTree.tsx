@@ -36,28 +36,28 @@ function TreeNodeRow({
         style={{ paddingLeft: `${depth * 16 + 12}px` }}
         className={`flex w-full items-center justify-between gap-3 py-1.5 pr-3 text-left text-sm transition-colors ${
           isSelected
-            ? "bg-blue-50 text-blue-900 font-medium"
-            : "text-slate-700 hover:bg-slate-100"
+            ? "bg-[#CFC5F0] text-blue-900 font-medium"
+            : "text-[#25213B] hover:bg-[#CFC5F0]"
         }`}
       >
         <span className="flex items-center gap-2 min-w-0">
           {isDir ? (
             <>
               {expanded ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#625D78] shrink-0" aria-hidden="true" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <ChevronRight className="w-3.5 h-3.5 text-[#625D78] shrink-0" aria-hidden="true" />
               )}
               {expanded ? (
-                <FolderOpen className="w-4 h-4 text-blue-700 shrink-0" aria-hidden="true" />
+                <FolderOpen className="w-4 h-4 text-[#6545D5] shrink-0" aria-hidden="true" />
               ) : (
-                <Folder className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+                <Folder className="w-4 h-4 text-[#625D78] shrink-0" aria-hidden="true" />
               )}
             </>
           ) : (
             <>
               <span className="w-3.5 shrink-0" aria-hidden="true" />
-              <FileCode2 className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+              <FileCode2 className="w-4 h-4 text-[#625D78] shrink-0" aria-hidden="true" />
             </>
           )}
           <span className="truncate font-mono text-xs">{sanitizeSingleLine(node.name)}</span>
@@ -68,7 +68,7 @@ function TreeNodeRow({
           ) : null}
         </span>
         {!isDir && node.size_bytes != null ? (
-          <span className="font-mono text-xs text-slate-500 tabular-nums shrink-0">
+          <span className="font-mono text-xs text-[#625D78] tabular-nums shrink-0">
             {formatBytes(node.size_bytes)}
           </span>
         ) : null}
@@ -106,7 +106,7 @@ export function FileTree({
   const testFileSet = new Set(testFiles);
 
   return (
-    <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
+    <div className="divide-y divide-slate-100 rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] overflow-hidden">
       <div className="py-1">
         <TreeNodeRow
           node={tree}

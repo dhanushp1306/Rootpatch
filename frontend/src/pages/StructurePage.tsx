@@ -28,7 +28,7 @@ export function StructurePage({
           <button
             type="button"
             onClick={onGoToUpload}
-            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+            className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
           >
             Go to Upload
           </button>
@@ -65,7 +65,7 @@ export function StructurePage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center justify-between text-xs text-[#625D78]">
             <span className="font-mono">
               root: {sanitizeSingleLine(structure.root_directory)}
             </span>
@@ -80,62 +80,62 @@ export function StructurePage({
         </div>
 
         <aside className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-slate-900">Selected Entry</h2>
+          <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-[#25213B]">Selected Entry</h2>
             {selectedNode ? (
               <dl className="space-y-2 text-xs">
                 <div>
-                  <dt className="text-slate-500">Name</dt>
-                  <dd className="font-mono font-semibold text-slate-900 break-all">
+                  <dt className="text-[#625D78]">Name</dt>
+                  <dd className="font-mono font-semibold text-[#25213B] break-all">
                     {sanitizeSingleLine(selectedNode.name)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Relative Path</dt>
-                  <dd className="font-mono text-slate-700 break-all">
+                  <dt className="text-[#625D78]">Relative Path</dt>
+                  <dd className="font-mono text-[#25213B] break-all">
                     {sanitizeSingleLine(selectedNode.path)}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Type</dt>
-                  <dd className="font-medium text-slate-900">{selectedNode.type}</dd>
+                  <dt className="text-[#625D78]">Type</dt>
+                  <dd className="font-medium text-[#25213B]">{selectedNode.type}</dd>
                 </div>
                 {selectedNode.size_bytes != null ? (
                   <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Size</dt>
-                    <dd className="font-mono text-slate-900 tabular-nums">
+                    <dt className="text-[#625D78]">Size</dt>
+                    <dd className="font-mono text-[#25213B] tabular-nums">
                       {formatBytes(selectedNode.size_bytes)}
                     </dd>
                   </div>
                 ) : null}
                 {selectedNode.children ? (
                   <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Direct Children</dt>
-                    <dd className="font-mono text-slate-900 tabular-nums">
+                    <dt className="text-[#625D78]">Direct Children</dt>
+                    <dd className="font-mono text-[#25213B] tabular-nums">
                       {selectedNode.children.length}
                     </dd>
                   </div>
                 ) : null}
               </dl>
             ) : (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#625D78]">
                 Select a file or directory in the tree to view metadata.
               </p>
             )}
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-3 text-xs">
-            <h2 className="text-sm font-semibold text-slate-900">Source & Test Layout</h2>
+          <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-3 text-xs">
+            <h2 className="text-sm font-semibold text-[#25213B]">Source & Test Layout</h2>
             <div>
-              <p className="font-medium text-slate-700 mb-1">Source Directories</p>
+              <p className="font-medium text-[#25213B] mb-1">Source Directories</p>
               {inspection.source_directories.length === 0 ? (
-                <p className="text-slate-500">None detected</p>
+                <p className="text-[#625D78]">None detected</p>
               ) : (
-                <ul className="space-y-1 font-mono text-slate-700">
+                <ul className="space-y-1 font-mono text-[#25213B]">
                   {inspection.source_directories.map((dir) => (
                     <li key={dir.path} className="flex justify-between gap-2">
                       <span className="truncate">{sanitizeSingleLine(dir.path)}</span>
-                      <span className="text-slate-500 tabular-nums shrink-0">
+                      <span className="text-[#625D78] tabular-nums shrink-0">
                         {dir.source_file_count}
                       </span>
                     </li>
@@ -144,14 +144,14 @@ export function StructurePage({
               )}
             </div>
 
-            <div className="border-t border-slate-200 pt-3">
-              <p className="font-medium text-slate-700 mb-1">
+            <div className="border-t border-[#D4CFF5] pt-3">
+              <p className="font-medium text-[#25213B] mb-1">
                 Test Files ({inspection.test_file_count})
               </p>
               {inspection.test_files.length === 0 ? (
-                <p className="text-slate-500">No test files detected</p>
+                <p className="text-[#625D78]">No test files detected</p>
               ) : (
-                <ul className="space-y-1 font-mono text-slate-700 max-h-48 overflow-y-auto">
+                <ul className="space-y-1 font-mono text-[#25213B] max-h-48 overflow-y-auto">
                   {inspection.test_files.map((tf) => (
                     <li key={tf} className="truncate">
                       {sanitizeSingleLine(tf)}

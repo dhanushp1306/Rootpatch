@@ -91,7 +91,7 @@ export function ValidationPage({
           <button
             type="button"
             onClick={onGoToUpload}
-            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+            className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
           >
             Go to Upload
           </button>
@@ -109,7 +109,7 @@ export function ValidationPage({
           <button
             type="button"
             onClick={onGoToPatches}
-            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 whitespace-nowrap"
+            className="rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap"
           >
             Open Patch Review
           </button>
@@ -181,14 +181,14 @@ export function ValidationPage({
     <div className="space-y-6">
       <form
         onSubmit={handleRunValidation}
-        className="rounded-lg border border-slate-200 bg-white p-5 space-y-4"
+        className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-4"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-base font-semibold text-[#25213B]">
               Isolated Container Patch Validation
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-[#625D78]">
               Runs project tests inside a network-disabled, read-only rootfs Docker container. Never
               executes untrusted code on the host.
             </p>
@@ -198,7 +198,7 @@ export function ValidationPage({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="validation-patch-select" className="block text-xs font-medium text-slate-700">
+            <label htmlFor="validation-patch-select" className="block text-xs font-medium text-[#25213B]">
               Target Patch
             </label>
             <select
@@ -209,7 +209,7 @@ export function ValidationPage({
                 setLatestReport(null);
                 setError(null);
               }}
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3 py-2 text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
             >
               {patchList.map((p) => (
                 <option key={p.patch_id} value={p.patch_id}>
@@ -220,7 +220,7 @@ export function ValidationPage({
           </div>
 
           <div>
-            <label htmlFor="validation-cmd-override" className="block text-xs font-medium text-slate-700">
+            <label htmlFor="validation-cmd-override" className="block text-xs font-medium text-[#25213B]">
               Optional Test Command Override (allowlisted)
             </label>
             <input
@@ -229,18 +229,18 @@ export function ValidationPage({
               value={testCommand}
               onChange={(e) => setTestCommand(e.target.value)}
               placeholder="Auto-detected if left blank (e.g. pytest -q)"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-[#C7C0F0] px-3 py-2 font-mono text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-6 text-xs text-slate-700">
+        <div className="flex flex-wrap items-center gap-6 text-xs text-[#25213B]">
           <label className="inline-flex items-center gap-2">
             <input
               type="checkbox"
               checked={runRegression}
               onChange={(e) => setRunRegression(e.target.checked)}
-              className="rounded border-slate-300 text-blue-700"
+              className="rounded border-[#C7C0F0] text-[#6545D5]"
             />
             <span>Run baseline vs patched regression comparison</span>
           </label>
@@ -249,7 +249,7 @@ export function ValidationPage({
               type="checkbox"
               checked={targetTestsOnly}
               onChange={(e) => setTargetTestsOnly(e.target.checked)}
-              className="rounded border-slate-300 text-blue-700"
+              className="rounded border-[#C7C0F0] text-[#6545D5]"
             />
             <span>Target related test files only</span>
           </label>
@@ -264,7 +264,7 @@ export function ValidationPage({
               <button
                 type="button"
                 onClick={onGoToPatches}
-                className="rounded-md border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 whitespace-nowrap"
+                className="rounded-lg border border-amber-400 bg-[#DCD7F2] px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-[#F5E4D4] whitespace-nowrap"
               >
                 Open Patch Review
               </button>
@@ -278,7 +278,7 @@ export function ValidationPage({
           <button
             type="submit"
             disabled={!effectivePatch || !effectivePatch.applied || running}
-            className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#6545D5] px-4 py-2 text-xs font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap shrink-0"
           >
             {running ? (
               <>
@@ -306,53 +306,53 @@ export function ValidationPage({
             />
           ) : null}
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D4CFF5] pb-4">
               <div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[#625D78]">
                   <StatusText label={latestReport.status} />
                   <span aria-hidden="true">·</span>
                   <span className="font-mono">{latestReport.test_framework}</span>
                   <span aria-hidden="true">·</span>
                   <span>{formatTimestamp(latestReport.validated_at)}</span>
                 </div>
-                <p className="mt-1 font-mono text-xs text-slate-700">
+                <p className="mt-1 font-mono text-xs text-[#25213B]">
                   Command: {latestReport.test_command.join(" ") || "None"} (source:{" "}
                   {latestReport.command_source})
                 </p>
               </div>
-              <div className="font-mono text-xs text-slate-600 tabular-nums">
+              <div className="font-mono text-xs text-[#625D78] tabular-nums">
                 Exit: {latestReport.exit_code ?? "—"} · {latestReport.duration_ms} ms
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <span className="text-slate-500">Total</span>
-                <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                <span className="text-[#625D78]">Total</span>
+                <p className="mt-1 text-lg font-bold text-[#25213B] tabular-nums">
                   {latestReport.total_tests}
                 </p>
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <span className="text-slate-500">Passed</span>
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                <span className="text-[#625D78]">Passed</span>
                 <p className="mt-1 text-lg font-bold text-emerald-700 tabular-nums">
                   {latestReport.passed_tests}
                 </p>
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <span className="text-slate-500">Failed</span>
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                <span className="text-[#625D78]">Failed</span>
                 <p className="mt-1 text-lg font-bold text-red-700 tabular-nums">
                   {latestReport.failed_tests}
                 </p>
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <span className="text-slate-500">Skipped</span>
-                <p className="mt-1 text-lg font-bold text-slate-700 tabular-nums">
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                <span className="text-[#625D78]">Skipped</span>
+                <p className="mt-1 text-lg font-bold text-[#25213B] tabular-nums">
                   {latestReport.skipped_tests}
                 </p>
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <span className="text-slate-500">Errors</span>
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3">
+                <span className="text-[#625D78]">Errors</span>
                 <p className="mt-1 text-lg font-bold text-red-700 tabular-nums">
                   {latestReport.error_tests}
                 </p>
@@ -360,9 +360,9 @@ export function ValidationPage({
             </div>
 
             {latestReport.regression_comparison ? (
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs">
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-4 space-y-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-900">Regression Comparison</span>
+                  <span className="font-semibold text-[#25213B]">Regression Comparison</span>
                   <StatusText
                     label={
                       latestReport.regression_comparison.regression_detected
@@ -373,7 +373,7 @@ export function ValidationPage({
                     }
                   />
                 </div>
-                <p className="text-slate-700">
+                <p className="text-[#25213B]">
                   {sanitizeDisplayText(latestReport.regression_comparison.summary)}
                 </p>
                 {latestReport.regression_comparison.tests_fixed.length > 0 ? (
@@ -390,12 +390,12 @@ export function ValidationPage({
             ) : null}
 
             {latestReport.execution_spec ? (
-              <div className="rounded-md border border-slate-200 bg-white p-4 text-xs space-y-1.5">
-                <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                  <Shield className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
+              <div className="rounded-lg border border-[#D4CFF5] bg-[#DCD7F2] p-4 text-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 font-semibold text-[#25213B]">
+                  <Shield className="w-3.5 h-3.5 text-[#6545D5]" aria-hidden="true" />
                   <span>Container Hardening Spec</span>
                 </div>
-                <p className="font-mono text-slate-600">
+                <p className="font-mono text-[#625D78]">
                   Image: {sanitizeSingleLine(latestReport.execution_spec.image)} · Network disabled:{" "}
                   {String(latestReport.execution_spec.network_disabled)} · Read-only root:{" "}
                   {String(latestReport.execution_spec.read_only_root)} · Mem:{" "}
@@ -408,7 +408,7 @@ export function ValidationPage({
             {latestReport.failure_details.length > 0 ? (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-red-700">Failure Details</p>
-                <ul className="list-disc pl-4 text-xs text-red-800 space-y-1">
+                <ul className="list-disc pl-4 text-xs text-[#D9485B] space-y-1">
                   {latestReport.failure_details.map((item, idx) => (
                     <li key={idx}>{sanitizeDisplayText(item)}</li>
                   ))}
@@ -418,8 +418,8 @@ export function ValidationPage({
 
             {latestReport.limitations.length > 0 ? (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-700">Limitations</p>
-                <ul className="list-disc pl-4 text-xs text-slate-600 space-y-1">
+                <p className="text-xs font-semibold text-[#25213B]">Limitations</p>
+                <ul className="list-disc pl-4 text-xs text-[#625D78] space-y-1">
                   {latestReport.limitations.map((item, idx) => (
                     <li key={idx}>{sanitizeDisplayText(item)}</li>
                   ))}
@@ -429,14 +429,14 @@ export function ValidationPage({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs font-semibold text-slate-700 mb-1.5">Container stdout</p>
-                <pre className="max-h-64 overflow-auto rounded-md border border-slate-200 bg-slate-950 p-3 font-mono text-xs text-slate-100 whitespace-pre-wrap">
+                <p className="text-xs font-semibold text-[#25213B] mb-1.5">Container stdout</p>
+                <pre className="max-h-64 overflow-auto rounded-lg border border-[#D4CFF5] bg-slate-950 p-3 font-mono text-xs text-slate-100 whitespace-pre-wrap">
                   {sanitizeDisplayText(latestReport.stdout, "(no stdout)")}
                 </pre>
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-700 mb-1.5">Container stderr</p>
-                <pre className="max-h-64 overflow-auto rounded-md border border-slate-200 bg-slate-950 p-3 font-mono text-xs text-slate-100 whitespace-pre-wrap">
+                <p className="text-xs font-semibold text-[#25213B] mb-1.5">Container stderr</p>
+                <pre className="max-h-64 overflow-auto rounded-lg border border-[#D4CFF5] bg-slate-950 p-3 font-mono text-xs text-slate-100 whitespace-pre-wrap">
                   {sanitizeDisplayText(latestReport.stderr, "(no stderr)")}
                 </pre>
               </div>
@@ -446,9 +446,9 @@ export function ValidationPage({
       ) : null}
 
       {patchHistory.length > 0 ? (
-        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">
+        <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] overflow-hidden">
+          <div className="border-b border-[#D4CFF5] px-5 py-3">
+            <h3 className="text-sm font-semibold text-[#25213B]">
               Validation Runs for Selected Patch ({patchHistory.length})
             </h3>
           </div>
@@ -458,15 +458,15 @@ export function ValidationPage({
                 key={item.validation_id}
                 type="button"
                 onClick={() => setLatestReport(item)}
-                className="flex w-full items-center justify-between gap-4 px-5 py-3 text-left text-xs hover:bg-slate-50"
+                className="flex w-full items-center justify-between gap-4 px-5 py-3 text-left text-xs hover:bg-[#E2DFF1]"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <StatusText label={item.status} />
-                  <span className="font-mono text-slate-600">
+                  <span className="font-mono text-[#625D78]">
                     {item.passed_tests}/{item.total_tests} passed
                   </span>
                 </div>
-                <span className="text-slate-500 shrink-0">
+                <span className="text-[#625D78] shrink-0">
                   {formatTimestamp(item.validated_at)}
                 </span>
               </button>

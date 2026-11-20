@@ -3,6 +3,22 @@
 @layer base {
   :root {
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --color-bg-main: #E9E7F5;
+    --color-bg-content: #E2DFF1;
+    --color-surface-primary: #DCD7F2;
+    --color-surface-secondary: #D9E8F8;
+    --color-surface-purple: #CFC5F0;
+    --color-surface-cyan: #CDECF0;
+    --color-surface-teal: #CDEBE1;
+    --color-surface-warm: #F5E4D4;
+    --color-text-primary: #25213B;
+    --color-text-secondary: #625D78;
+    --color-accent-purple: #6545D5;
+    --color-accent-blue: #2878C7;
+    --color-accent-cyan: #0891B2;
+    --color-success: #138A67;
+    --color-warning: #C47A20;
+    --color-error: #D9485B;
   }
 
   code,
@@ -14,4 +30,9 @@
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Subtle gradient for main content area */
+.bg-gradient-content {
+  background: linear-gradient(135deg, #E9E7F5 0%, #E2DFF1 50%, #DCD7F2 100%);
 }

@@ -52,8 +52,8 @@ const TONE_CLASSES: Record<Tone, string> = {
   success: "text-emerald-700",
   danger: "text-red-700",
   warning: "text-amber-700",
-  info: "text-blue-700",
-  neutral: "text-slate-600",
+  info: "text-[#6545D5]",
+  neutral: "text-[#625D78]",
 };
 
 function renderToneIcon(tone: Tone, value: string) {

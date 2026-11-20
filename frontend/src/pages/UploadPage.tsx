@@ -107,11 +107,11 @@ export function UploadPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <form
           onSubmit={handleUploadSubmit}
-          className="lg:col-span-2 rounded-lg border border-slate-200 bg-white p-6 space-y-5"
+          className="lg:col-span-2 rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-6 space-y-5"
         >
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Upload Project Archive</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <h2 className="text-base font-semibold text-[#25213B]">Upload Project Archive</h2>
+            <p className="mt-1 text-xs text-[#625D78]">
               Upload a <code className="font-mono">.zip</code> source archive. RootPatch extracts it
               into an isolated workspace and inspects files without executing code on the host.
             </p>
@@ -129,17 +129,17 @@ export function UploadPage({
               const dropped = e.dataTransfer.files?.[0] ?? null;
               handleFileSelected(dropped);
             }}
-            className={`rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors ${
+            className={`rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
               dragging
-                ? "border-blue-600 bg-blue-50"
-                : "border-slate-300 bg-slate-50 hover:border-slate-400"
+                ? "border-indigo-500 bg-[#CFC5F0]"
+                : "border-[#C7C0F0] bg-[#E2DFF1] hover:border-slate-400"
             }`}
           >
-            <UploadCloud className="mx-auto w-8 h-8 text-slate-400" aria-hidden="true" />
-            <p className="mt-2 text-sm font-medium text-slate-800">
+            <UploadCloud className="mx-auto w-8 h-8 text-[#625D78]" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-[#25213B]">
               Drag and drop a <span className="font-mono">.zip</span> archive here
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-[#625D78]">
               or browse your local filesystem (max 50 MB default backend limit)
             </p>
             <input
@@ -154,7 +154,7 @@ export function UploadPage({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 whitespace-nowrap"
+                className="rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3.5 py-2 text-xs font-semibold text-[#25213B] hover:bg-[#E2DFF1] whitespace-nowrap"
               >
                 Choose .zip File
               </button>
@@ -162,14 +162,14 @@ export function UploadPage({
           </div>
 
           {selectedFile ? (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] px-4 py-3 text-xs">
               <div className="flex items-center gap-2.5 min-w-0">
-                <FileArchive className="w-4 h-4 text-blue-700 shrink-0" aria-hidden="true" />
-                <span className="font-mono font-medium text-slate-900 truncate">
+                <FileArchive className="w-4 h-4 text-[#6545D5] shrink-0" aria-hidden="true" />
+                <span className="font-mono font-medium text-[#25213B] truncate">
                   {sanitizeSingleLine(selectedFile.name)}
                 </span>
               </div>
-              <span className="font-mono text-slate-500 tabular-nums shrink-0">
+              <span className="font-mono text-[#625D78] tabular-nums shrink-0">
                 {formatBytes(selectedFile.size)}
               </span>
             </div>
@@ -177,13 +177,13 @@ export function UploadPage({
 
           {uploading || progress > 0 ? (
             <div className="space-y-1.5">
-              <div className="flex justify-between text-xs text-slate-600">
+              <div className="flex justify-between text-xs text-[#625D78]">
                 <span>{uploading ? "Uploading and inspecting archive..." : "Upload complete"}</span>
                 <span className="font-mono tabular-nums">{progress}%</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-indigo-100 overflow-hidden">
                 <div
-                  className="h-full bg-blue-700 transition-all"
+                  className="h-full bg-[#6545D5] transition-all"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -201,7 +201,7 @@ export function UploadPage({
             <button
               type="submit"
               disabled={!selectedFile || uploading}
-              className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#6545D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5535C5] disabled:opacity-50 whitespace-nowrap shrink-0"
             >
               {uploading ? (
                 <>
@@ -217,18 +217,18 @@ export function UploadPage({
 
         <form
           onSubmit={handleLoadProject}
-          className="rounded-lg border border-slate-200 bg-white p-6 space-y-4"
+          className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-6 space-y-4"
         >
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Load Existing Project</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <h2 className="text-base font-semibold text-[#25213B]">Load Existing Project</h2>
+            <p className="mt-1 text-xs text-[#625D78]">
               Open a previously uploaded workspace by its 32-character hexadecimal{" "}
               <code className="font-mono">project_id</code>.
             </p>
           </div>
 
           <div>
-            <label htmlFor="load-project-id" className="block text-xs font-medium text-slate-700">
+            <label htmlFor="load-project-id" className="block text-xs font-medium text-[#25213B]">
               Project ID
             </label>
             <input
@@ -237,7 +237,7 @@ export function UploadPage({
               value={lookupId}
               onChange={(e) => setLookupId(e.target.value)}
               placeholder="e.g. 9f3c1e7b42..."
-              className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="mt-1.5 w-full rounded-lg border border-[#C7C0F0] px-3 py-2 font-mono text-xs text-[#25213B] focus:border-indigo-500 focus:outline-none"
             />
           </div>
 
@@ -248,7 +248,7 @@ export function UploadPage({
           <button
             type="submit"
             disabled={loadingExisting}
-            className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 whitespace-nowrap"
+            className="w-full rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-4 py-2 text-xs font-semibold text-[#25213B] hover:bg-[#E2DFF1] disabled:opacity-50 whitespace-nowrap"
           >
             {loadingExisting ? "Loading Project..." : "Load Project Workspace"}
           </button>
@@ -257,17 +257,17 @@ export function UploadPage({
 
       {/* Inspection Report */}
       {activeProject && inspection ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <section className="rounded-xl border border-[#D4CFF5] bg-[#DCD7F2] p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#D4CFF5] pb-4">
             <div>
               <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold">
                 <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                 <span>Inspection Report</span>
               </div>
-              <h3 className="mt-1 text-base font-semibold text-slate-900">
+              <h3 className="mt-1 text-base font-semibold text-[#25213B]">
                 {sanitizeSingleLine(activeProject.project_name)}
               </h3>
-              <p className="text-xs text-slate-500 font-mono">
+              <p className="text-xs text-[#625D78] font-mono">
                 {activeProject.project_id} · {activeProject.archive.files_extracted} extracted files ·{" "}
                 {formatBytes(activeProject.archive.extracted_bytes)}
               </p>
@@ -276,7 +276,7 @@ export function UploadPage({
               <button
                 type="button"
                 onClick={onContinueToStructure}
-                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#C7C0F0] bg-[#DCD7F2] px-3 py-1.5 text-xs font-semibold text-[#25213B] hover:bg-[#E2DFF1] whitespace-nowrap shrink-0"
               >
                 <span>Browse Structure</span>
                 <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -284,7 +284,7 @@ export function UploadPage({
               <button
                 type="button"
                 onClick={onContinueToScan}
-                className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#6545D5] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#5535C5] whitespace-nowrap shrink-0"
               >
                 <span>Run Static Scan</span>
                 <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -293,27 +293,27 @@ export function UploadPage({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500">Total Files</span>
-              <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">
+            <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3.5">
+              <span className="text-[#625D78]">Total Files</span>
+              <p className="mt-1 text-lg font-bold text-[#25213B] tabular-nums">
                 {inspection.total_files}
               </p>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500">Directories</span>
-              <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">
+            <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3.5">
+              <span className="text-[#625D78]">Directories</span>
+              <p className="mt-1 text-lg font-bold text-[#25213B] tabular-nums">
                 {inspection.total_directories}
               </p>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500">Python Detected</span>
-              <p className="mt-1 text-lg font-bold text-slate-900">
+            <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3.5">
+              <span className="text-[#625D78]">Python Detected</span>
+              <p className="mt-1 text-lg font-bold text-[#25213B]">
                 {inspection.python_detected ? "Yes" : "No"}
               </p>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500">Test Files</span>
-              <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">
+            <div className="rounded-lg border border-[#D4CFF5] bg-[#E2DFF1] p-3.5">
+              <span className="text-[#625D78]">Test Files</span>
+              <p className="mt-1 text-lg font-bold text-[#25213B] tabular-nums">
                 {inspection.test_file_count}
               </p>
             </div>
@@ -321,15 +321,15 @@ export function UploadPage({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
             <div>
-              <h4 className="font-semibold text-slate-900 mb-2">Detected Languages</h4>
+              <h4 className="font-semibold text-[#25213B] mb-2">Detected Languages</h4>
               {inspection.languages.length === 0 ? (
-                <p className="text-slate-500">No recognized source languages.</p>
+                <p className="text-[#625D78]">No recognized source languages.</p>
               ) : (
-                <ul className="space-y-1.5 text-slate-700">
+                <ul className="space-y-1.5 text-[#25213B]">
                   {inspection.languages.map((lang) => (
                     <li key={lang.name} className="flex justify-between gap-2">
                       <span>{sanitizeSingleLine(lang.name)}</span>
-                      <span className="font-mono text-slate-500 tabular-nums">
+                      <span className="font-mono text-[#625D78] tabular-nums">
                         {lang.file_count} files
                       </span>
                     </li>
@@ -339,16 +339,16 @@ export function UploadPage({
             </div>
 
             <div>
-              <h4 className="font-semibold text-slate-900 mb-2">Dependency Manifests</h4>
+              <h4 className="font-semibold text-[#25213B] mb-2">Dependency Manifests</h4>
               {inspection.dependency_manifests.length === 0 ? (
-                <p className="text-slate-500">No manifests detected.</p>
+                <p className="text-[#625D78]">No manifests detected.</p>
               ) : (
-                <ul className="space-y-1.5 font-mono text-slate-700">
+                <ul className="space-y-1.5 font-mono text-[#25213B]">
                   {inspection.dependency_manifests.map((m) => (
                     <li key={m.path} className="truncate">
                       {sanitizeSingleLine(m.path)}
                       {m.ecosystem ? (
-                        <span className="ml-1.5 font-sans text-slate-500">
+                        <span className="ml-1.5 font-sans text-[#625D78]">
                           ({sanitizeSingleLine(m.ecosystem)})
                         </span>
                       ) : null}
@@ -359,11 +359,11 @@ export function UploadPage({
             </div>
 
             <div>
-              <h4 className="font-semibold text-slate-900 mb-2">Configuration Files</h4>
+              <h4 className="font-semibold text-[#25213B] mb-2">Configuration Files</h4>
               {inspection.configuration_files.length === 0 ? (
-                <p className="text-slate-500">No config files detected.</p>
+                <p className="text-[#625D78]">No config files detected.</p>
               ) : (
-                <ul className="space-y-1.5 font-mono text-slate-700">
+                <ul className="space-y-1.5 font-mono text-[#25213B]">
                   {inspection.configuration_files.slice(0, 10).map((cfg) => (
                     <li key={cfg.path} className="truncate">
                       {sanitizeSingleLine(cfg.path)}

@@ -71,7 +71,7 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
                 <button
                   type="button"
                   onClick={() => removeKnownProject(activeProjectId)}
-                  className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-50 whitespace-nowrap"
+                  className="rounded-lg border border-red-300 bg-[#DCD7F2] px-3 py-1.5 text-xs font-semibold text-[#D9485B] hover:bg-red-50 whitespace-nowrap"
                 >
                   Remove from Recent Projects
                 </button>
@@ -89,7 +89,7 @@ export function App({ client = apiClient, initialSection = "dashboard" }: AppPro
                 onClick={() => {
                   void workspace.refreshAll();
                 }}
-                className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-50 whitespace-nowrap"
+                className="rounded-lg border border-red-300 bg-[#DCD7F2] px-3 py-1.5 text-xs font-semibold text-[#D9485B] hover:bg-red-50 whitespace-nowrap"
               >
                 Retry
               </button>
