@@ -7,6 +7,7 @@ stored here.
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 _DEFAULT_CORS_ORIGINS = (
     "http://localhost:5173",  # Vite dev server
