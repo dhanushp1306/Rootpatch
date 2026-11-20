@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="RootPatch">
+  <defs>
+    <linearGradient id="rootpatch-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6545D5" />
+      <stop offset="100%" stop-color="#0891B2" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#rootpatch-gradient)" />
+  <path
+    d="M11 9 L6 16 L11 23"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M21 9 L26 16 L21 23"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M14.5 20.5 L17.5 11.5"
+    fill="none"
+    stroke="#CDECF0"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+</svg>
